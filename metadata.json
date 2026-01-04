@@ -1,0 +1,7 @@
+{
+  "name": "Money-Shark - Capital Management",
+  "description": "A streamlined capital tracking application for private lenders. Features compound interest calculation, customer management, and AI-powered document scanning for automated record keeping.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
