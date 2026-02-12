@@ -32,3 +32,6 @@ prisma/*.db-journal
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
+.env*.local

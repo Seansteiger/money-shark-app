@@ -4,19 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:server": "tsx --tsconfig backend/tsconfig.json backend/src/server.ts",
-    "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "build": "vite build",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "build:backend": "npx prisma generate && npx prisma migrate deploy",
-    "start": "node --loader tsx --tsconfig backend/tsconfig.json backend/src/server.ts",
-    "preview": "vite preview",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@google/genai": "^1.33.0",
+    "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "^6.5.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
@@ -26,6 +25,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "next": "^15.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "zod": "^3.24.2"
@@ -39,8 +39,8 @@
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.1.2",
     "prisma": "^6.5.0",
-    "typescript": "~5.8.2",
     "tsx": "^4.20.5",
+    "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
 }

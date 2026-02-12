@@ -93,3 +93,11 @@ enum LoanStatus {
   PAID
   DEFAULTED
 }
+
+model Comment {
+  id        String   @id @default(cuid())
+  comment   String
+  createdAt DateTime @default(now())
+
+  @@map("comments")
+}
