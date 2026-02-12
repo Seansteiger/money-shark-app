@@ -385,7 +385,7 @@ app.post('/api/loans', requireAuth, async (req, res) => {
 });
 
 app.delete('/api/loans/:id', requireAuth, async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
 
   const existing = await prisma.loan.findFirst({
     where: {
