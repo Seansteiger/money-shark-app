@@ -14,9 +14,13 @@ dist-ssr
 .env
 .env.*
 !.env.example
+!.env.production
 
 prisma/*.db
 prisma/*.db-journal
+
+# Vercel
+.vercel
 
 # Editor directories and files
 .vscode/*

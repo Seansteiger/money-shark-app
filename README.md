@@ -51,3 +51,7 @@ Backend runs on `http://localhost:4000`
 - Use PostgreSQL in production by setting `DATABASE_URL`
 - Set `SECURE_COOKIES=true` behind HTTPS
 - Keep `.env` out of source control
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for complete deployment instructions to Vercel (frontend) and Render/Railway (backend).

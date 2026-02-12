@@ -8,6 +8,8 @@
     "dev:server": "tsx --tsconfig backend/tsconfig.json backend/src/server.ts",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
+    "build:backend": "npx prisma generate && npx prisma migrate deploy",
+    "start": "node --loader tsx --tsconfig backend/tsconfig.json backend/src/server.ts",
     "preview": "vite preview",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init"
