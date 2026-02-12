@@ -3,7 +3,19 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 import { Customer, Loan, InterestType, AppSettings } from './types';
 import { calculateLoanDetails, formatCurrency, formatDate } from './utils/calculations';
-import { supabase } from './utils/supabase';
+import {
+  authStore,
+  createLoan,
+  deleteLoan as deleteLoanById,
+  getBootstrap,
+  getMe,
+  login,
+  logout,
+  refreshToken,
+  register,
+  resetAllData,
+  saveSettings,
+} from './utils/api';
 
 // Icons
 const Icons = {
@@ -36,10 +48,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 
-// Mock Data Removed - Using Supabase
-
-
-const APP_PIN = "1234";
+// Data source is the local API backend.
 
 export default function App() {
   const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings'>('dashboard');
@@ -51,8 +60,12 @@ export default function App() {
 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authPin, setAuthPin] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Reset Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -65,48 +78,44 @@ export default function App() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Initial Data Fetch
+  // Initial Auth + Data Fetch
   useEffect(() => {
-    fetchData();
+    bootstrapApp();
   }, []);
 
-  const fetchData = async () => {
+  const bootstrapApp = async () => {
     setLoading(true);
+    setAuthLoading(true);
     try {
-      // 1. Settings
-      const { data: settingsData } = await supabase.from('site_settings').select('value').eq('key', 'app_settings').single();
-      if (settingsData) {
-        setSettings(settingsData.value);
-        setTempSettings(settingsData.value);
+      if (!authStore.getAccessToken()) {
+        const refreshed = await refreshToken();
+        if (!refreshed) {
+          setIsAuthenticated(false);
+          return;
+        }
       }
 
-      // 2. Customers
-      const { data: custData } = await supabase.from('shark_customers').select('*').order('created_at', { ascending: false });
-      if (custData) {
-        setCustomers(custData);
-      }
+      await getMe();
+      setIsAuthenticated(true);
+      await fetchData();
+    } catch {
+      authStore.clear();
+      setIsAuthenticated(false);
+    } finally {
+      setAuthLoading(false);
+      setLoading(false);
+    }
+  };
 
-      // 3. Loans
-      const { data: loanData } = await supabase.from('shark_loans').select('*').order('created_at', { ascending: false });
-      if (loanData) {
-        const mappedLoans: Loan[] = loanData.map((l: any) => ({
-          id: l.id,
-          customerId: l.customer_id,
-          principal: parseFloat(l.principal),
-          initialInterestRate: parseFloat(l.initial_interest_rate),
-          interestRate: parseFloat(l.interest_rate),
-          startDate: l.start_date,
-          interestType: l.interest_type as InterestType,
-          isFixedRate: l.is_fixed_rate,
-          status: l.status,
-          notes: l.notes
-        }));
-        setLoans(mappedLoans);
-      }
+  const fetchData = async () => {
+    try {
+      const data = await getBootstrap();
+      setSettings(data.settings);
+      setTempSettings(data.settings);
+      setCustomers(data.customers);
+      setLoans(data.loans);
     } catch (error) {
       console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -171,21 +180,35 @@ export default function App() {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (authPin === APP_PIN) {
+    setAuthError('');
+
+    try {
+      if (isRegisterMode) {
+        await register({ name: authName, email: authEmail, password: authPassword });
+      } else {
+        await login({ email: authEmail, password: authPassword });
+      }
       setIsAuthenticated(true);
-      setAuthError('');
-      setAuthPin('');
-    } else {
-      setAuthError('Access Denied. Incorrect PIN.');
-      setAuthPin('');
+      await fetchData();
+      setAuthPassword('');
+      setAuthEmail('');
+      setAuthName('');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Authentication failed');
+      setAuthPassword('');
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     setIsAuthenticated(false);
     setIsMenuOpen(false);
+    setCustomers([]);
+    setLoans([]);
+    setSettings(DEFAULT_SETTINGS);
+    setTempSettings(DEFAULT_SETTINGS);
   };
 
   const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || 'Unknown';
@@ -198,11 +221,9 @@ export default function App() {
 
   const handleConfirmReset = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (resetPinInput === APP_PIN) {
+    if (resetPinInput.trim().toUpperCase() === 'RESET') {
       try {
-        await supabase.from('shark_loans').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-        await supabase.from('shark_customers').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-        await supabase.from('site_settings').delete().eq('key', 'app_settings');
+        await resetAllData();
 
         setCustomers([]);
         setLoans([]);
@@ -217,22 +238,16 @@ export default function App() {
         setResetError('System Error during reset');
       }
     } else {
-      setResetError('Incorrect PIN');
+      setResetError('Type RESET to confirm');
       setResetPinInput('');
     }
   };
 
   const handleSaveSettings = async () => {
-    setSettings(tempSettings);
-
-    // Persist to Supabase
     try {
-      const { error } = await supabase.from('site_settings').upsert({
-        key: 'app_settings',
-        value: tempSettings
-      }, { onConflict: 'key' });
-
-      if (error) throw error;
+      const saved = await saveSettings(tempSettings);
+      setSettings(saved);
+      setTempSettings(saved);
 
       setSettingsSuccess(true);
       setTimeout(() => setSettingsSuccess(false), 3000);
@@ -268,25 +283,16 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1. Upload to Supabase Storage (Temp) to satisfy backend requirement
-    const tempFileName = `temp_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9]/g, '')}`;
-    try {
-      await supabase.storage.from('shark-receipts').upload(tempFileName, file);
-    } catch (err) {
-      console.error("Upload failed (continuing with local processing):", err);
-    }
-
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64String = reader.result as string;
       setScannedImage(base64String);
-      // Pass tempFileName to analyzeImage for cleanup
-      analyzeImage(base64String.split(',')[1], file.type, tempFileName);
+      analyzeImage(base64String.split(',')[1], file.type);
     };
     reader.readAsDataURL(file);
   };
 
-  const analyzeImage = async (base64Data: string, mimeType: string, tempFileName?: string) => {
+  const analyzeImage = async (base64Data: string, mimeType: string) => {
     setIsAnalyzing(true);
     setScanClarification(null);
 
@@ -346,11 +352,6 @@ export default function App() {
       setEntryMode('manual');
     } finally {
       setIsAnalyzing(false);
-      // Clean up the temp image from backend
-      if (tempFileName) {
-        await supabase.storage.from('shark-receipts').remove([tempFileName]);
-        console.log(`Deleted temp image: ${tempFileName}`);
-      }
     }
   };
 
@@ -362,27 +363,8 @@ export default function App() {
 
     setLoading(true);
     try {
-      // Find or Create Customer
-      let customerId = '';
-      const existing = customers.find(c => c.name.toLowerCase() === formData.customerName.toLowerCase());
-
-      if (existing) {
-        customerId = existing.id;
-      } else {
-        const { data: newCust, error: custError } = await supabase.from('shark_customers').insert({
-          name: formData.customerName
-        }).select().single();
-
-        if (custError) throw custError;
-        if (newCust) {
-          customerId = newCust.id;
-          setCustomers(prev => [...prev, newCust]);
-        }
-      }
-
-      // Create Loan
       const loanPayload = {
-        customer_id: customerId,
+        customerName: formData.customerName,
         principal: parseFloat(formData.principal),
         initial_interest_rate: parseFloat(formData.initialInterestRate),
         interest_rate: parseFloat(formData.interestRate),
@@ -393,24 +375,22 @@ export default function App() {
         notes: formData.notes + (scanClarification ? ` [AI Note: ${scanClarification}]` : '')
       };
 
-      const { data: newLoan, error: loanError } = await supabase.from('shark_loans').insert(loanPayload).select().single();
-      if (loanError) throw loanError;
+      const { customer, loan } = await createLoan({
+        customerName: loanPayload.customerName,
+        principal: loanPayload.principal,
+        initialInterestRate: loanPayload.initial_interest_rate,
+        interestRate: loanPayload.interest_rate,
+        startDate: loanPayload.start_date,
+        interestType: loanPayload.interest_type,
+        isFixedRate: loanPayload.is_fixed_rate,
+        notes: loanPayload.notes,
+      });
 
-      if (newLoan) {
-        const mappedLoan: Loan = {
-          id: newLoan.id,
-          customerId: newLoan.customer_id,
-          principal: parseFloat(newLoan.principal),
-          initialInterestRate: parseFloat(newLoan.initial_interest_rate),
-          interestRate: parseFloat(newLoan.interest_rate),
-          startDate: newLoan.start_date,
-          interestType: newLoan.interest_type as InterestType,
-          isFixedRate: newLoan.is_fixed_rate,
-          status: newLoan.status,
-          notes: newLoan.notes
-        };
-        setLoans(prev => [mappedLoan, ...prev]);
+      if (!customers.some(c => c.id === customer.id)) {
+        setCustomers(prev => [customer, ...prev]);
       }
+
+      setLoans(prev => [loan, ...prev]);
 
       // Reset Form
       setFormData({
@@ -438,7 +418,7 @@ export default function App() {
   const deleteLoan = async (id: string) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
     try {
-      await supabase.from('shark_loans').delete().eq('id', id);
+      await deleteLoanById(id);
       setLoans(loans.filter(l => l.id !== id));
     } catch (err) {
       console.error("Delete failed", err);
@@ -459,6 +439,14 @@ export default function App() {
   );
 
   // --- Auth Render ---
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-shark-900 text-white font-sans">
+        <div className="text-sm text-shark-300">Loading secure workspace...</div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-shark-900 text-white font-sans">
@@ -467,19 +455,46 @@ export default function App() {
             <h1 className="text-3xl font-bold tracking-tight mb-2">
               <span className="text-money-500">Money</span>-Shark
             </h1>
-            <p className="text-shark-400 text-sm uppercase tracking-widest">Restricted Access Terminal</p>
+            <p className="text-shark-400 text-sm uppercase tracking-widest">Secure Access</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
+            {isRegisterMode && (
+              <div>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  placeholder="e.g. Melville Doe"
+                  className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                  required
+                />
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Security PIN</label>
+              <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Email</label>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Password</label>
               <input
                 type="password"
-                value={authPin}
-                onChange={(e) => setAuthPin(e.target.value)}
-                placeholder="••••"
-                className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-center text-2xl tracking-widest text-white focus:border-money-500 outline-none transition-colors"
-                autoFocus
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••••••"
+                className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                required
               />
             </div>
 
@@ -493,12 +508,21 @@ export default function App() {
               type="submit"
               className="w-full py-4 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2"
             >
-              <Icons.Unlock /> Access System
+              <Icons.Unlock /> {isRegisterMode ? 'Create Account' : 'Access System'}
             </button>
           </form>
 
-          <div className="mt-8 text-center">
-            <span className="text-xs text-shark-600">Default PIN: 1234</span>
+          <div className="mt-6 text-center text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode((prev) => !prev);
+                setAuthError('');
+              }}
+              className="text-money-500 hover:text-money-400"
+            >
+              {isRegisterMode ? 'Already have an account? Sign in' : 'No account? Create one'}
+            </button>
           </div>
         </div>
       </div>
@@ -608,13 +632,13 @@ export default function App() {
               This will permanently erase all customers and loan records. This action cannot be undone.
             </p>
             <form onSubmit={handleConfirmReset}>
-              <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Enter Admin PIN to confirm</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Type RESET to confirm</label>
               <input
-                type="password"
+                type="text"
                 value={resetPinInput}
                 onChange={(e) => setResetPinInput(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-center tracking-widest text-slate-900 dark:text-white focus:border-red-500 outline-none transition-colors mb-2"
-                placeholder="••••"
+                placeholder="RESET"
                 autoFocus
               />
               {resetError && <div className="text-xs text-red-500 mb-2 font-medium text-center">{resetError}</div>}

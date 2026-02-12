@@ -1,33 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Money Shark - Capital Management
 
-# Run and deploy your AI Studio app
+This project has been rebuilt as a full-stack app with a code-based backend (no Supabase runtime dependency).
 
-This contains everything you need to run your app locally.
+## Stack
 
-View your app in AI Studio: https://ai.studio/apps/drive/1f6Tf8J4ZYdAOK6oXn8sQRSdmfmUHRncm
+- Frontend: React + Vite + TypeScript
+- Backend: Express + TypeScript
+- Database: Prisma ORM + SQLite (default, swappable via `DATABASE_URL`)
+- Auth: JWT access tokens + rotating refresh tokens (httpOnly cookie)
+- Security: `helmet`, `cors`, `express-rate-limit`, `bcryptjs`, server-side input validation with `zod`
 
-## Deployment to Vercel
+## Features
 
-The app is configured for seamless deployment on Vercel.
+- Secure user registration and login
+- Per-user isolated data (supports many users)
+- Loan/customer management
+- Global app settings per user
+- Full reset endpoint scoped to current user
+- Persistent database via Prisma migrations
 
-1.  **Push to GitHub**: Ensure your code is pushed to a GitHub repository.
-2.  **Import to Vercel**: Connect your repository in Vercel.
-3.  **Environment Variables**: Add the following environment variables in Vercel Project Settings:
-    *   `VITE_SUPABASE_URL`
-    *   `VITE_SUPABASE_ANON_KEY`
-    *   `VITE_GEMINI_API_KEY` (Optional, if using AI features)
-4.  **Deploy**: Vercel will automatically detect Vite and run `npm run build`.
-
-## Run Locally
-
-**Prerequisites:**  Node.js
+## Quick Start
 
 1. Install dependencies:
-   `npm install`
-2. Configure Environment:
-   *   Copy `.env.example` to `.env.local`
-   *   Fill in your Supabase and Gemini keys.
-3. Run the app:
-   `npm run dev`
+   - `npm install`
+2. Configure environment:
+   - Copy `.env.example` to `.env`
+   - Set strong values for:
+     - `ACCESS_TOKEN_SECRET`
+     - `REFRESH_TOKEN_SECRET`
+3. Generate Prisma client and run migration:
+   - `npm run prisma:generate`
+   - `npm run prisma:migrate`
+4. Start frontend + backend together:
+   - `npm run dev:full`
+
+Frontend runs on `http://localhost:3000`
+Backend runs on `http://localhost:4000`
+
+## Scripts
+
+- `npm run dev` - frontend only
+- `npm run dev:server` - backend only
+- `npm run dev:full` - frontend + backend
+- `npm run build` - frontend build
+- `npm run prisma:generate` - Prisma client generation
+- `npm run prisma:migrate` - apply schema migration
+
+## Production Notes
+
+- Use PostgreSQL in production by setting `DATABASE_URL`
+- Set `SECURE_COOKIES=true` behind HTTPS
+- Keep `.env` out of source control
