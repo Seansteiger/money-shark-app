@@ -13,7 +13,18 @@ import {
   updateLoanStatus,
   seedDemoData,
 } from './utils/api';
+import {
+  saveCachedSnapshot,
+  getCachedSnapshot,
+  saveDraftEntry,
+  getDraftEntry,
+  clearDraftEntry,
+  saveThemePreference,
+  getThemePreference,
+  clearAllDeviceStorage,
+} from './utils/storage';
 import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
+
 
 // Icons
 const Icons = {
@@ -79,15 +90,58 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeviceHydrated, setIsDeviceHydrated] = useState(false);
   const liveData = useQuery(api.bootstrap.get, isAuthenticated ? undefined : "skip");
 
-  // Sync Live Convex Data to state for seamless compatibility
+  // 1. Instant On-Device IndexedDB Hydration (0ms load)
+  useEffect(() => {
+    let isMounted = true;
+    async function hydrate() {
+      try {
+        // Hydrate Theme
+        const savedTheme = await getThemePreference();
+        if (savedTheme && isMounted) setTheme(savedTheme);
+
+        // Hydrate Cached Snapshot
+        const cached = await getCachedSnapshot();
+        if (cached && isMounted) {
+          if (cached.settings) setSettings(cached.settings);
+          if (cached.customers?.length) setCustomers(cached.customers);
+          if (cached.loans?.length) setLoans(cached.loans);
+          setLoading(false);
+        }
+
+        // Hydrate Unsaved Form Draft
+        const draft = await getDraftEntry();
+        if (draft && isMounted) {
+          if (draft.formData) setFormData(draft.formData);
+          if (draft.scannedImage) setScannedImage(draft.scannedImage);
+          if (draft.scanClarification) setScanClarification(draft.scanClarification);
+        }
+      } catch (err) {
+        console.warn('Device storage hydration skipped:', err);
+      } finally {
+        if (isMounted) setIsDeviceHydrated(true);
+      }
+    }
+    hydrate();
+    return () => { isMounted = false; };
+  }, []);
+
+  // 2. Sync Live Convex Data to state and asynchronously mirror to IndexedDB
   useEffect(() => {
     if (liveData) {
       setSettings(liveData.settings);
       setCustomers(liveData.customers);
       setLoans(liveData.loans as any[]);
       setLoading(false);
+
+      // Cache snapshot to on-device IndexedDB
+      saveCachedSnapshot({
+        settings: liveData.settings,
+        customers: liveData.customers,
+        loans: liveData.loans as any[],
+      }).catch((e) => console.warn('Failed to mirror to device storage:', e));
     }
   }, [liveData]);
 
@@ -116,7 +170,18 @@ export default function App() {
   const [scanClarification, setScanClarification] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Apply Theme Effect
+  // 3. Debounced Draft Auto-Save to IndexedDB
+  useEffect(() => {
+    if (!isDeviceHydrated) return;
+    if (formData.customerName || formData.principal || formData.notes || scannedImage) {
+      const timer = setTimeout(() => {
+        saveDraftEntry({ formData, scannedImage, scanClarification }).catch(() => {});
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [formData, scannedImage, scanClarification, isDeviceHydrated]);
+
+  // Apply Theme Effect & Persist
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -145,7 +210,11 @@ export default function App() {
   }, [view, settings]);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      saveThemePreference(next).catch(() => {});
+      return next;
+    });
   };
 
   const toggleMenu = () => {
@@ -178,6 +247,7 @@ export default function App() {
     setLoans([]);
     setSettings(DEFAULT_SETTINGS);
     setTempSettings(DEFAULT_SETTINGS);
+    await clearAllDeviceStorage();
   };
 
   const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || 'Unknown';
@@ -193,6 +263,7 @@ export default function App() {
     if (resetPinInput.trim().toUpperCase() === 'RESET') {
       try {
         await resetAllData();
+        await clearAllDeviceStorage();
 
         setCustomers([]);
         setLoans([]);
@@ -383,6 +454,7 @@ export default function App() {
       });
       setScannedImage(null);
       setScanClarification(null);
+      clearDraftEntry().catch(() => {});
       setView('dashboard');
 
     } catch (err) {
@@ -574,6 +646,13 @@ export default function App() {
             <span className="text-money-600 dark:text-money-500">Money</span>
             <span className="text-slate-900 dark:text-white">-Shark</span>
           </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="hidden sm:inline">On-Device Cache Active</span>
+            <span className="sm:hidden">Local DB</span>
+          </div>
         </div>
       </header>
 
