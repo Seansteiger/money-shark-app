@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
+import { useQuery } from 'convex/react';
+import { api } from './convex/_generated/api';
 
 import { Customer, Loan, InterestType, AppSettings } from './types';
 import { calculateLoanDetails, formatCurrency, formatDate } from './utils/calculations';
 import {
-  authStore,
   createLoan,
   deleteLoan as deleteLoanById,
-  getBootstrap,
-  getMe,
-  login,
-  logout,
-  refreshToken,
-  register,
   resetAllData,
   saveSettings,
+  updateLoanStatus,
+  seedDemoData,
 } from './utils/api';
+import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
 
 // Icons
 const Icons = {
@@ -38,7 +36,9 @@ const Icons = {
   Lock: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>,
   Unlock: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>,
   LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>,
-  Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+  Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
+  GitHub: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>,
+  Google: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/></svg>
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -58,14 +58,16 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Convex Auth Hooks
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const { signIn, signOut } = useAuthActions();
+
   // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(true);
 
   // Reset Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -77,47 +79,17 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const liveData = useQuery(api.bootstrap.get, isAuthenticated ? undefined : "skip");
 
-  // Initial Auth + Data Fetch
+  // Sync Live Convex Data to state for seamless compatibility
   useEffect(() => {
-    bootstrapApp();
-  }, []);
-
-  const bootstrapApp = async () => {
-    setLoading(true);
-    setAuthLoading(true);
-    try {
-      if (!authStore.getAccessToken()) {
-        const refreshed = await refreshToken();
-        if (!refreshed) {
-          setIsAuthenticated(false);
-          return;
-        }
-      }
-
-      await getMe();
-      setIsAuthenticated(true);
-      await fetchData();
-    } catch {
-      authStore.clear();
-      setIsAuthenticated(false);
-    } finally {
-      setAuthLoading(false);
+    if (liveData) {
+      setSettings(liveData.settings);
+      setCustomers(liveData.customers);
+      setLoans(liveData.loans as any[]);
       setLoading(false);
     }
-  };
-
-  const fetchData = async () => {
-    try {
-      const data = await getBootstrap();
-      setSettings(data.settings);
-      setTempSettings(data.settings);
-      setCustomers(data.customers);
-      setLoans(data.loans);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
+  }, [liveData]);
 
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -186,12 +158,10 @@ export default function App() {
 
     try {
       if (isRegisterMode) {
-        await register({ name: authName, email: authEmail, password: authPassword });
+        await signIn("password", { name: authName, email: authEmail, password: authPassword, flow: "signUp" });
       } else {
-        await login({ email: authEmail, password: authPassword });
+        await signIn("password", { email: authEmail, password: authPassword, flow: "signIn" });
       }
-      setIsAuthenticated(true);
-      await fetchData();
       setAuthPassword('');
       setAuthEmail('');
       setAuthName('');
@@ -202,8 +172,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await logout();
-    setIsAuthenticated(false);
+    await signOut();
     setIsMenuOpen(false);
     setCustomers([]);
     setLoans([]);
@@ -298,8 +267,18 @@ export default function App() {
 
     // AI Logic (Dormant)
     try {
-      // @ts-ignore
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "YOUR_API_KEY_HERE";
+      const getGeminiApiKey = () => {
+        if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+          return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        }
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+          // @ts-ignore
+          return import.meta.env.VITE_GEMINI_API_KEY;
+        }
+        return "YOUR_API_KEY_HERE";
+      };
+      const apiKey = getGeminiApiKey();
       const ai = new GoogleGenAI({ apiKey });
 
       const prompt = `Analyze this image for loan/debt information. 
@@ -307,7 +286,7 @@ export default function App() {
       Return JSON only.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Data } },
@@ -328,8 +307,7 @@ export default function App() {
         }
       });
 
-      // Fix: response.text might be a string in this SDK version
-      const textVal = typeof response.text === 'function' ? response.text() : response.text;
+      const textVal = response.text;
       const result = JSON.parse(textVal as string);
 
       // Populate Form
@@ -425,6 +403,16 @@ export default function App() {
     }
   };
 
+  const changeLoanStatus = async (id: string, status: Loan['status']) => {
+    try {
+      await updateLoanStatus(id, status);
+      setLoans(loans.map(l => l.id === id ? { ...l, status } : l));
+    } catch (err) {
+      console.error("Status update failed", err);
+      alert("Failed to update status.");
+    }
+  };
+
   const NavItem = ({ id, icon: Icon, label }: any) => (
     <button
       onClick={() => { setView(id); setIsMenuOpen(false); }}
@@ -496,6 +484,16 @@ export default function App() {
                 className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
                 required
               />
+              {isRegisterMode && (
+                <div className="text-xs text-shark-400 mt-2 space-y-1 bg-shark-900/50 p-3 rounded-lg border border-shark-700">
+                  <span className="block font-bold text-shark-500 uppercase text-[10px] mb-1">Password Requirements:</span>
+                  <span className={authPassword.length >= 10 ? 'text-green-400 block' : 'text-shark-400 block'}>• At least 10 characters</span>
+                  <span className={/[A-Z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one uppercase letter</span>
+                  <span className={/[a-z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one lowercase letter</span>
+                  <span className={/[0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one number</span>
+                  <span className={/[^A-Za-z0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one symbol</span>
+                </div>
+              )}
             </div>
 
             {authError && (
@@ -511,6 +509,40 @@ export default function App() {
               <Icons.Unlock /> {isRegisterMode ? 'Create Account' : 'Access System'}
             </button>
           </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-shark-700/50"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-shark-800 px-2 text-shark-400">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <button
+              type="button"
+              onClick={() => signIn("github")}
+              className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200"
+            >
+              <Icons.GitHub /> GitHub
+            </button>
+            <button
+              type="button"
+              onClick={() => signIn("google")}
+              className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200"
+            >
+              <Icons.Google /> Google
+            </button>
+          </div>
+
+          {!isRegisterMode && (
+            <div className="mt-8 p-4 bg-shark-900/50 border border-shark-700 rounded-2xl text-center">
+              <p className="text-xs text-shark-400">
+                Or sign up a new account using any email and password above.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 text-center text-sm">
             <button
@@ -547,7 +579,7 @@ export default function App() {
 
       {/* SIDEBAR DRAWER - COLLAPSIBLE MENU */}
       <div
-        className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-shark-900 border-r border-slate-200 dark:border-shark-800 z-30 transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-shark-900 border-r border-slate-200 dark:border-shark-800 z-50 transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="h-16 flex items-center px-4 border-b border-slate-200 dark:border-shark-800">
           <h2 className="text-sm font-bold text-slate-400 dark:text-shark-500 uppercase tracking-widest">Navigation</h2>
@@ -586,8 +618,8 @@ export default function App() {
                     <div className="text-[10px] text-slate-400 dark:text-shark-500">Lock entry inputs to global defaults</div>
                   </div>
                 </div>
-                <div className={`w-10 h-5 rounded-full relative transition-colors ${formData.isFixedRate ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}>
-                  <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-transform ${formData.isFixedRate ? 'left-6' : 'left-1'}`}></div>
+                <div className="w-10 h-5 rounded-full relative transition-colors bg-slate-300 dark:bg-shark-600" style={{ backgroundColor: formData.isFixedRate ? 'var(--money-600, #10b981)' : '' }}>
+                  <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${formData.isFixedRate ? 'translate-x-5' : 'translate-x-0'}`}></div>
                 </div>
               </button>
 
@@ -616,7 +648,7 @@ export default function App() {
 
       {/* BACKDROP */}
       {isMenuOpen && (
-        <div onClick={toggleMenu} className="fixed inset-0 bg-black/50 z-20 backdrop-blur-sm transition-opacity"></div>
+        <div onClick={toggleMenu} className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity"></div>
       )}
 
       {/* RESET CONFIRMATION MODAL */}
@@ -653,25 +685,25 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto pt-16 relative">
+      <div className="flex-1 overflow-auto pt-16 pb-20 md:pb-6 relative">
         <div className="p-6 max-w-6xl mx-auto space-y-8">
 
           {/* VIEW: DASHBOARD */}
           {view === 'dashboard' && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-shark-800 p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
-                  <h3 className="text-slate-400 dark:text-shark-400 text-sm font-medium uppercase tracking-wider mb-2">Total Deployed</h3>
-                  <div className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalPrincipal)}</div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
+                  <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Total Deployed</h3>
+                  <div className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalPrincipal)}</div>
                 </div>
-                <div className="bg-white dark:bg-shark-800 p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
-                  <h3 className="text-slate-400 dark:text-shark-400 text-sm font-medium uppercase tracking-wider mb-2">Accrued Interest</h3>
-                  <div className="text-3xl font-bold text-money-600 dark:text-money-500">+{formatCurrency(totalInterest)}</div>
-                  <div className="text-xs text-slate-400 dark:text-shark-500 mt-1">Based on current rates</div>
+                <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
+                  <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Accrued Interest</h3>
+                  <div className="text-xl md:text-3xl font-bold text-money-600 dark:text-money-500">+{formatCurrency(totalInterest)}</div>
+                  <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 mt-1">Based on current rates</div>
                 </div>
-                <div className="bg-white dark:bg-shark-800 p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
-                  <h3 className="text-slate-400 dark:text-shark-400 text-sm font-medium uppercase tracking-wider mb-2">Total Value</h3>
-                  <div className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalValue)}</div>
+                <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300 col-span-2 md:col-span-1">
+                  <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Total Value</h3>
+                  <div className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalValue)}</div>
                 </div>
               </div>
 
@@ -705,35 +737,58 @@ export default function App() {
                     const activeMonthlyRate = loan.isFixedRate ? settings.globalInterestRate : loan.interestRate;
 
                     return (
-                      <div key={loan.id} className="bg-white dark:bg-shark-800 p-5 rounded-xl border border-slate-200 dark:border-shark-700 flex flex-col md:flex-row md:items-center justify-between hover:border-money-500 dark:hover:border-shark-600 transition-colors shadow-sm">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{getCustomerName(loan.customerId)}</h3>
-                            <span className="text-xs bg-slate-100 dark:bg-shark-900 text-slate-500 dark:text-shark-400 px-2 py-1 rounded border border-slate-200 dark:border-shark-700">
-                              {activeMonthlyRate}%/mo
-                            </span>
+                      <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 hover:border-money-500 dark:hover:border-shark-600 transition-colors shadow-sm flex flex-col gap-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCustomerName(loan.customerId)}</h3>
+                              <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-500 dark:text-shark-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-shark-700">
+                                {activeMonthlyRate}%/mo
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-shark-400 mt-1">
+                              Started {formatDate(loan.startDate)} • Initial: {activeInitialRate}%
+                            </div>
                           </div>
-                          <div className="text-sm text-slate-500 dark:text-shark-400">
-                            Started {formatDate(loan.startDate)} • Initial: {activeInitialRate}%
+
+                          <div className="flex gap-1 md:gap-2">
+                            <button 
+                              onClick={() => changeLoanStatus(loan.id, 'PAID')} 
+                              title="Mark as Paid"
+                              className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-100/50 dark:hover:bg-green-950/30 rounded-lg transition-colors"
+                            >
+                              <Icons.Check />
+                            </button>
+                            <button 
+                              onClick={() => changeLoanStatus(loan.id, 'DEFAULTED')} 
+                              title="Mark as Defaulted"
+                              className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-100/50 dark:hover:bg-orange-950/30 rounded-lg transition-colors"
+                            >
+                              <Icons.X />
+                            </button>
+                            <button 
+                              onClick={() => deleteLoan(loan.id)} 
+                              title="Delete Record"
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                            >
+                              <Icons.Trash />
+                            </button>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-8 mt-4 md:mt-0">
-                          <div className="text-right">
-                            <div className="text-xs text-slate-400 dark:text-shark-500 uppercase">Principal</div>
-                            <div className="text-slate-600 dark:text-shark-300 font-mono">{formatCurrency(loan.principal)}</div>
+                        <div className="grid grid-cols-3 gap-2 w-full pt-3 border-t border-slate-100 dark:border-shark-800/80 md:border-t-0 md:pt-0 md:flex md:items-center md:justify-end md:gap-8 md:w-auto ml-auto">
+                          <div className="text-left md:text-right">
+                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Principal</div>
+                            <div className="text-sm md:text-base text-slate-600 dark:text-shark-300 font-mono font-medium">{formatCurrency(loan.principal)}</div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-xs text-slate-400 dark:text-shark-500 uppercase">Interest</div>
-                            <div className="text-money-600 dark:text-money-500 font-mono font-bold">+{formatCurrency(calc.interestAccrued)}</div>
+                          <div className="text-left md:text-right">
+                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Interest</div>
+                            <div className="text-sm md:text-base text-money-600 dark:text-money-500 font-mono font-bold">+{formatCurrency(calc.interestAccrued)}</div>
                           </div>
-                          <div className="text-right border-l border-slate-200 dark:border-shark-700 pl-6">
-                            <div className="text-xs text-slate-400 dark:text-shark-500 uppercase">Total Due</div>
-                            <div className="text-xl font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(calc.totalAmount)}</div>
+                          <div className="text-right border-l border-slate-100 dark:border-shark-800 pl-4 md:pl-6 md:border-l-2">
+                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Total Due</div>
+                            <div className="text-base md:text-xl font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(calc.totalAmount)}</div>
                           </div>
-                          <button onClick={() => deleteLoan(loan.id)} className="text-slate-400 hover:text-red-500 dark:text-shark-600 dark:hover:text-red-400 transition-colors">
-                            <Icons.Trash />
-                          </button>
                         </div>
                       </div>
                     );
@@ -741,6 +796,74 @@ export default function App() {
                   {filteredActiveLoans.length === 0 && (
                     <div className="text-center py-12 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-800/50 rounded-xl border border-slate-200 dark:border-shark-700 border-dashed">
                       {searchTerm ? 'No loans matching your search.' : 'No active loans found.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* History / Closed Loans Section */}
+              <div className="mt-12 border-t border-slate-200 dark:border-shark-800 pt-8">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-6">Closed & History Records</h2>
+                <div className="grid gap-4">
+                  {loans.filter(l => l.status !== 'ACTIVE').map((loan) => {
+                    const calc = calculateLoanDetails(loan, settings.globalInitialInterestRate, settings.globalInterestRate);
+                    return (
+                      <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 flex flex-col gap-4 opacity-75 shadow-sm hover:opacity-100 transition-all duration-300">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCustomerName(loan.customerId)}</h3>
+                              <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                                loan.status === 'PAID' 
+                                  ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30'
+                                  : 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30'
+                              }`}>
+                                {loan.status}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-shark-400 mt-1">
+                              Started {formatDate(loan.startDate)} • Notes: {loan.notes || "None"}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1 md:gap-2">
+                            <button 
+                              onClick={() => changeLoanStatus(loan.id, 'ACTIVE')} 
+                              title="Re-activate Loan"
+                              className="p-1.5 text-money-600 dark:text-money-400 hover:bg-money-100/50 dark:hover:bg-money-950/30 rounded-lg transition-colors"
+                            >
+                              <Icons.Refresh />
+                            </button>
+                            <button 
+                              onClick={() => deleteLoan(loan.id)} 
+                              title="Delete Record"
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                            >
+                              <Icons.Trash />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 w-full pt-3 border-t border-slate-100 dark:border-shark-800/80 md:border-t-0 md:pt-0 md:flex md:items-center md:justify-end md:gap-8 md:w-auto ml-auto">
+                          <div className="text-left md:text-right">
+                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Principal</div>
+                            <div className="text-sm md:text-base text-slate-600 dark:text-shark-300 font-mono font-medium">{formatCurrency(loan.principal)}</div>
+                          </div>
+                          <div className="text-left md:text-right">
+                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Interest</div>
+                            <div className="text-sm md:text-base text-slate-600 dark:text-shark-300 font-mono">{formatCurrency(calc.interestAccrued)}</div>
+                          </div>
+                          <div className="text-right border-l border-slate-100 dark:border-shark-800 pl-4 md:pl-6 md:border-l-2">
+                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Total Due</div>
+                            <div className="text-base md:text-xl font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(calc.totalAmount)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {loans.filter(l => l.status !== 'ACTIVE').length === 0 && (
+                    <div className="text-center py-6 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-800/30 rounded-xl border border-slate-200 dark:border-shark-700 border-dashed text-xs">
+                      No closed or archived loans.
                     </div>
                   )}
                 </div>
@@ -785,13 +908,12 @@ export default function App() {
                 >
                   <Icons.Pen /> Manual Input
                 </button>
-                {/* AI Scan Temporarily Disabled */}
-                {/* <button 
+                <button 
                   onClick={() => setEntryMode('scan')}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-colors ${entryMode === 'scan' ? 'bg-shark-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:text-shark-400 dark:hover:text-white'}`}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-colors ${entryMode === 'scan' ? 'bg-money-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:text-shark-400 dark:hover:text-white'}`}
                 >
-                  <Icons.Camera /> Scan Receipt
-                </button> */}
+                  <Icons.Camera /> Scan Receipt / Ledger
+                </button>
               </div>
 
               {/* Mode: Scan Upload */}
@@ -1005,7 +1127,7 @@ export default function App() {
                     onClick={() => setTempSettings({ ...tempSettings, globalCompoundMonthly: !tempSettings.globalCompoundMonthly })}
                     className={`w-12 h-6 rounded-full transition-colors relative ${tempSettings.globalCompoundMonthly ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
                   >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${tempSettings.globalCompoundMonthly ? 'left-7' : 'left-1'}`}></div>
+                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.globalCompoundMonthly ? 'translate-x-6' : 'translate-x-0'}`}></div>
                   </button>
                 </div>
 
@@ -1068,6 +1190,61 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* Bottom Navigation Bar for Mobile */}
+      <nav className={`md:hidden fixed bottom-4 left-4 right-4 h-16 bg-white/90 dark:bg-shark-950/90 backdrop-blur-lg border border-slate-200/80 dark:border-shark-800/80 rounded-2xl flex items-center justify-around z-30 px-2 shadow-2xl transition-all duration-300 ${isMenuOpen ? 'translate-y-24 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+        {/* Overview */}
+        <button
+          onClick={() => setView('dashboard')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-300 ${
+            view === 'dashboard' 
+              ? 'text-money-600 dark:text-money-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+              : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icons.TrendingUp />
+          <span className="text-[10px] mt-1 font-medium">Overview</span>
+        </button>
+
+        {/* Loans */}
+        <button
+          onClick={() => setView('loans')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-300 ${
+            view === 'loans' 
+              ? 'text-money-600 dark:text-money-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+              : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icons.Users />
+          <span className="text-[10px] mt-1 font-medium">Loans</span>
+        </button>
+
+        {/* New Entry */}
+        <button
+          onClick={() => setView('entry')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-300 ${
+            view === 'entry' 
+              ? 'text-money-600 dark:text-money-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+              : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icons.Plus />
+          <span className="text-[10px] mt-1 font-medium">New Entry</span>
+        </button>
+
+        {/* Settings */}
+        <button
+          onClick={() => setView('settings')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-300 ${
+            view === 'settings' 
+              ? 'text-money-600 dark:text-money-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+              : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icons.Settings />
+          <span className="text-[10px] mt-1 font-medium">Settings</span>
+        </button>
+      </nav>
     </div>
   );
 }

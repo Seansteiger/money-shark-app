@@ -1,0 +1,33 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
+
+export default defineSchema({
+  ...authTables,
+
+  settings: defineTable({
+    userId: v.id("users"),
+    globalInitialInterestRate: v.number(),
+    globalInterestRate: v.number(),
+    globalCompoundMonthly: v.boolean(),
+  }).index("by_userId", ["userId"]),
+
+  customers: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    notes: v.optional(v.string()),
+  }).index("by_userId_name", ["userId", "name"]),
+
+  loans: defineTable({
+    userId: v.id("users"),
+    customerId: v.id("customers"),
+    principal: v.number(),
+    initialInterestRate: v.number(),
+    interestRate: v.number(),
+    startDate: v.string(), // ISO Date YYYY-MM-DD
+    interestType: v.union(v.literal("SIMPLE"), v.literal("COMPOUND")),
+    isFixedRate: v.boolean(),
+    status: v.union(v.literal("ACTIVE"), v.literal("PAID"), v.literal("DEFAULTED")),
+    notes: v.optional(v.string()),
+  }).index("by_userId", ["userId"]),
+});
