@@ -55,6 +55,8 @@ const Icons = {
   Sparkles: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
   RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
   CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>,
+  Smartphone: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
+  Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -190,6 +192,44 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [formData, scannedImage, scanClarification, isDeviceHydrated]);
+
+  // 4. PWA Installation State
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isStandaloneApp, setIsStandaloneApp] = useState(false);
+  const [showIosInstallModal, setShowIosInstallModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+      setIsStandaloneApp(isStandalone);
+
+      const handleBeforeInstall = (e: Event) => {
+        e.preventDefault();
+        setDeferredInstallPrompt(e);
+      };
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+      return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    }
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredInstallPrompt(null);
+        setIsStandaloneApp(true);
+      }
+    } else {
+      const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIos) {
+        setShowIosInstallModal(true);
+      } else {
+        alert('To install Money Shark on your device:\n\n1. Open your browser menu (⋮ or ⋯)\n2. Select "Install App" or "Add to Home screen"');
+      }
+    }
+  };
 
   // Apply Theme Effect & Persist
   useEffect(() => {
@@ -743,6 +783,17 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {!isStandaloneApp && (
+            <button
+              onClick={handleInstallApp}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-money-500/10 hover:bg-money-500/20 border border-money-500/30 text-money-600 dark:text-money-400 text-xs font-semibold transition-all cursor-pointer shadow-sm"
+              title="Install App on Device"
+            >
+              <Icons.Smartphone />
+              <span className="hidden sm:inline">Install App</span>
+              <span className="sm:hidden">Install</span>
+            </button>
+          )}
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-mono">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="hidden sm:inline">On-Device Cache Active</span>
@@ -763,6 +814,27 @@ export default function App() {
         </div>
 
         <div className="p-4 flex-1 overflow-y-auto space-y-6">
+          {!isStandaloneApp && (
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                handleInstallApp();
+              }}
+              className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-money-600/20 via-money-500/10 to-transparent border border-money-500/30 hover:border-money-500 text-money-600 dark:text-money-400 transition-all text-left group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-money-500 text-white shadow-md shadow-money-500/30 group-hover:scale-110 transition-transform">
+                  <Icons.Smartphone />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900 dark:text-white">Install App</div>
+                  <div className="text-[11px] text-slate-500 dark:text-shark-400">Home Screen / Desktop</div>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-money-600 dark:text-money-400 bg-money-500/10 px-2 py-0.5 rounded-full border border-money-500/20">PWA</span>
+            </button>
+          )}
+
           <nav className="space-y-2">
             <NavItem id="dashboard" icon={Icons.TrendingUp} label="Overview" />
             <NavItem id="loans" icon={Icons.Users} label="Loans & Customers" />
@@ -1561,6 +1633,46 @@ export default function App() {
           <span className="text-[10px] mt-1 font-medium">Settings</span>
         </button>
       </nav>
+
+      {/* iOS PWA INSTALL INSTRUCTIONS MODAL */}
+      {showIosInstallModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-shark-900 border border-slate-200 dark:border-shark-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-money-500/20 text-money-600 dark:text-money-400 flex items-center justify-center mx-auto shadow-inner">
+              <Icons.Smartphone />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Install on iPhone / iPad</h3>
+              <p className="text-xs text-slate-500 dark:text-shark-400 mt-1">Install Money Shark as a native full-screen app on your home screen.</p>
+            </div>
+
+            <div className="space-y-3 text-left bg-slate-50 dark:bg-shark-800/60 p-4 rounded-2xl border border-slate-200 dark:border-shark-700 text-xs">
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">1</span>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">Tap the Share Button</p>
+                  <p className="text-slate-500 dark:text-shark-400">At the bottom bar in Safari, tap the <strong>Share</strong> icon (square with arrow pointing up).</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">2</span>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">Add to Home Screen</p>
+                  <p className="text-slate-500 dark:text-shark-400">Scroll down the menu and tap <strong>"Add to Home Screen"</strong>.</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowIosInstallModal(false)}
+              className="w-full py-3 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-money-900/30"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
