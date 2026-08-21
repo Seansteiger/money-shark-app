@@ -283,11 +283,19 @@ export default function App() {
 
     try {
       if (authStep === 'otp-verify') {
-        // Verify 6-digit email code
-        await signIn("resend", {
-          email: authEmail.trim().toLowerCase(),
-          code: authOtpCode.trim(),
-        });
+        // Verify 6-digit email code (handles both Password email-verification and direct Email OTP)
+        try {
+          await signIn("password", {
+            email: authEmail.trim().toLowerCase(),
+            code: authOtpCode.trim(),
+            flow: "email-verification",
+          });
+        } catch (pwErr) {
+          await signIn("resend", {
+            email: authEmail.trim().toLowerCase(),
+            code: authOtpCode.trim(),
+          });
+        }
         setAuthOtpCode('');
         setAuthStep('credentials');
       } else if (authStep === 'reset-verify') {
@@ -302,21 +310,28 @@ export default function App() {
         setAuthPassword('');
         setAuthStep('credentials');
       } else if (isRegisterMode) {
-        // Registration: Send verification email with 6-digit code + verify button
-        await signIn("resend", {
-          email: authEmail.trim().toLowerCase(),
+        // Registration: creates account and sends verification email (user is NOT logged in until verified)
+        const res = await signIn("password", {
           name: authName.trim(),
+          email: authEmail.trim().toLowerCase(),
+          password: authPassword,
+          flow: "signUp",
         });
         setAuthStep('otp-verify');
         setResendStatus(`Verification email sent to ${authEmail}`);
       } else {
         // Standard Password Sign-in
-        await signIn("password", {
+        const res = await signIn("password", {
           email: authEmail.trim().toLowerCase(),
           password: authPassword,
           flow: "signIn",
         });
-        setAuthPassword('');
+        if (res && res.signingIn === false) {
+          setAuthStep('otp-verify');
+          setResendStatus(`Account pending verification. A 6-digit code was sent to ${authEmail}`);
+        } else {
+          setAuthPassword('');
+        }
       }
     } catch (error: any) {
       const msg = error instanceof Error ? error.message : 'Authentication failed';
@@ -343,6 +358,31 @@ export default function App() {
       setResendStatus(`Verification email sent to ${authEmail}`);
     } catch (err: any) {
       setAuthError(err instanceof Error ? err.message : 'Failed to send verification email');
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setAuthError('');
+    setResendStatus('');
+    setIsSubmittingAuth(true);
+    try {
+      if (authPassword && isRegisterMode) {
+        await signIn("password", {
+          name: authName.trim(),
+          email: authEmail.trim().toLowerCase(),
+          password: authPassword,
+          flow: "signUp",
+        });
+      } else {
+        await signIn("resend", {
+          email: authEmail.trim().toLowerCase(),
+        });
+      }
+      setResendStatus(`A fresh verification email was sent to ${authEmail}`);
+    } catch (err: any) {
+      setAuthError(err instanceof Error ? err.message : 'Failed to resend verification email');
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -816,7 +856,7 @@ export default function App() {
               <div className="flex items-center justify-between text-xs pt-2">
                 <button
                   type="button"
-                  onClick={handleSendEmailOtp}
+                  onClick={handleResendOtp}
                   disabled={isSubmittingAuth}
                   className="text-money-500 hover:text-money-400 hover:underline cursor-pointer"
                 >
@@ -1100,7 +1140,7 @@ export default function App() {
                   ) : (
                     <Icons.Unlock />
                   )}
-                  <span>{isRegisterMode ? 'Create Account' : 'Access System'}</span>
+                  <span>{isRegisterMode ? 'Create Account & Verify Email' : 'Access System'}</span>
                 </button>
               </form>
 

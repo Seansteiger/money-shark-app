@@ -31,7 +31,7 @@ export const ResendEmail = Email({
               <h1 style="color:#FFFFFF;margin:0;font-size:24px;letter-spacing:-0.5px;">
                 <span style="color:#10B981;">Money</span>-Shark
               </h1>
-              <p style="color:#94A3B8;font-size:12px;margin-top:6px;letter-spacing:1px;text-transform:uppercase;">Account Verification</p>
+              <p style="color:#94A3B8;font-size:12px;margin-top:6px;letter-spacing:1px;text-transform:uppercase;">Email Verification Required</p>
             </div>
 
             <div style="background:#1E293B;padding:24px;border-radius:12px;text-align:center;border:1px solid #334155;margin-bottom:24px;">
@@ -41,7 +41,7 @@ export const ResendEmail = Email({
             </div>
 
             <div style="text-align:center;margin-bottom:24px;">
-              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Option 2: 1-Click Instant Sign-In</p>
+              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Option 2: 1-Click Instant Verification</p>
               <a href="${url}" style="display:inline-block;background:#10B981;color:#FFFFFF;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px;box-shadow:0 4px 14px rgba(16,185,129,0.4);">
                 Verify & Sign In Directly →
               </a>
@@ -68,6 +68,7 @@ export const ResendEmail = Email({
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({
+      verify: ResendEmail,
       reset: ResendEmail,
     }),
     ResendEmail,
