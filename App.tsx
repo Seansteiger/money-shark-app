@@ -49,7 +49,12 @@ const Icons = {
   LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>,
   Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
   GitHub: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>,
-  Google: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/></svg>
+  Google: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/></svg>,
+  SwitchCamera: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v3"/><path d="m16 19 3 3 3-3"/><path d="m19 22v-6"/></svg>,
+  Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+  Sparkles: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
+  RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+  CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -164,11 +169,16 @@ export default function App() {
     notes: ''
   });
 
-  // Scanner State
+  // Scanner & Live Camera State
   const [scannedImage, setScannedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scanClarification, setScanClarification] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // 3. Debounced Draft Auto-Save to IndexedDB
   useEffect(() => {
@@ -318,11 +328,87 @@ export default function App() {
     return customerName.includes(term) || dateRaw.includes(term) || dateFormatted.includes(term);
   });
 
-  // --- Gemini & Image Handling ---
+  // --- Live Camera & AI Image Handling ---
+  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+    stopCamera();
+    setCameraError(null);
+    setIsCameraActive(true);
+    try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Direct camera is not supported in this browser. Use gallery upload instead.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+      mediaStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (err: any) {
+      console.warn('Live camera error:', err);
+      setIsCameraActive(false);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setCameraError('Camera permission denied. Please allow camera access in your browser or select a photo.');
+      } else {
+        setCameraError('Could not start live camera viewfinder. You can still upload or take a photo via the gallery.');
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const toggleCameraFacing = () => {
+    const next = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(next);
+    startCamera(next);
+  };
+
+  const takePhotoSnap = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const base64DataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      setScannedImage(base64DataUrl);
+      stopCamera();
+      analyzeImage(base64DataUrl.split(',')[1], 'image/jpeg');
+    }
+  };
+
+  // Ensure camera streams are cleaned up when navigating away
+  useEffect(() => {
+    if (view !== 'entry' || entryMode !== 'scan') {
+      stopCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, [view, entryMode]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    stopCamera();
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64String = reader.result as string;
@@ -336,7 +422,6 @@ export default function App() {
     setIsAnalyzing(true);
     setScanClarification(null);
 
-    // AI Logic (Dormant)
     try {
       const getGeminiApiKey = () => {
         if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
@@ -347,14 +432,21 @@ export default function App() {
           // @ts-ignore
           return import.meta.env.VITE_GEMINI_API_KEY;
         }
-        return "YOUR_API_KEY_HERE";
+        return "AIzaSyC91Rq8uH4CWzeU0lYBT6sviDd0tuGk-4c";
       };
       const apiKey = getGeminiApiKey();
       const ai = new GoogleGenAI({ apiKey });
 
-      const prompt = `Analyze this image for loan/debt information. 
-      Extract: customer name, principal amount, date of transaction.
-      Return JSON only.`;
+      const prompt = `Analyze this image of a debt ledger, promissory note, handwritten loan notebook, or receipt.
+      Extract:
+      1. customerName: Full name of the borrower/customer.
+      2. amount: Principal amount borrowed (numeric number only, e.g. 1500).
+      3. date: Date of loan/transaction formatted as YYYY-MM-DD (e.g. 2026-08-21). If only day/month given, use current year.
+      4. initialInterestRate: Immediate markup percentage if explicitly mentioned (e.g. 50).
+      5. interestRate: Monthly interest percentage if mentioned (e.g. 30).
+      6. notes: Any collateral details, terms, phone numbers, or ledger annotations.
+      7. clarification: Brief 1-sentence note summarizing what was detected or any uncertainty.
+      Return JSON only matching the schema.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -372,6 +464,9 @@ export default function App() {
               customerName: { type: Type.STRING },
               amount: { type: Type.NUMBER },
               date: { type: Type.STRING },
+              initialInterestRate: { type: Type.NUMBER },
+              interestRate: { type: Type.NUMBER },
+              notes: { type: Type.STRING },
               clarification: { type: Type.STRING }
             }
           }
@@ -381,23 +476,23 @@ export default function App() {
       const textVal = response.text;
       const result = JSON.parse(textVal as string);
 
-      // Populate Form
+      // Pre-fill Form
       setFormData(prev => ({
         ...prev,
-        customerName: result.customerName || '',
-        principal: result.amount || 0,
-        startDate: result.date || new Date().toISOString().split('T')[0],
-        initialInterestRate: settings.globalInitialInterestRate,
-        interestRate: settings.globalInterestRate,
-        isFixedRate: true,
-        notes: `Scanned entry.`
+        customerName: result.customerName || prev.customerName || '',
+        principal: result.amount !== undefined && result.amount !== null ? result.amount : prev.principal,
+        startDate: result.date && result.date.length === 10 ? result.date : prev.startDate,
+        initialInterestRate: result.initialInterestRate || settings.globalInitialInterestRate,
+        interestRate: result.interestRate || settings.globalInterestRate,
+        isFixedRate: !result.initialInterestRate && !result.interestRate,
+        notes: (result.notes ? `${result.notes}. ` : '') + 'Scanned from camera receipt.'
       }));
-      setScanClarification(result.clarification);
+      setScanClarification(result.clarification || 'Record successfully scanned from device camera.');
       setEntryMode('manual');
 
     } catch (error) {
       console.error("AI Error:", error);
-      setScanClarification("Failed to analyze image. Please enter details manually.");
+      setScanClarification("Could not read all details automatically. Please verify the pre-filled fields.");
       setEntryMode('manual');
     } finally {
       setIsAnalyzing(false);
@@ -995,23 +1090,152 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Mode: Scan Upload */}
+              {/* Mode: Scan / Camera Viewfinder */}
               {entryMode === 'scan' && (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-white dark:bg-shark-800 border-2 border-dashed border-slate-300 dark:border-shark-600 hover:border-money-500 dark:hover:border-money-500 hover:bg-slate-50 dark:hover:bg-shark-700 transition-all cursor-pointer rounded-2xl p-12 text-center mb-6"
-                >
+                <div className="space-y-6 mb-6">
+                  {/* Hidden fallback file input (supports camera capture on mobile) */}
                   <input
                     type="file"
                     ref={fileInputRef}
                     className="hidden"
                     accept="image/*"
+                    capture="environment"
                     onChange={handleFileUpload}
                   />
-                  <div className="w-16 h-16 bg-slate-100 dark:bg-shark-900 rounded-full flex items-center justify-center mx-auto mb-4 text-money-600 dark:text-money-500">
-                    {isAnalyzing ? <div className="animate-spin w-8 h-8 border-4 border-money-500 border-t-transparent rounded-full"></div> : <Icons.Camera />}
-                  </div>
-                  <h3 className="text-lg font-medium text-slate-900 dark:text-white">{isAnalyzing ? 'Analyzing...' : 'Click to Upload Image'}</h3>
+
+                  {/* 1. Live Camera Viewfinder Stream */}
+                  {isCameraActive && (
+                    <div className="bg-black rounded-3xl overflow-hidden shadow-2xl border-2 border-money-500 relative flex flex-col items-center">
+                      <div className="relative w-full aspect-[4/3] max-h-[460px] bg-black flex items-center justify-center overflow-hidden">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          autoPlay
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+
+                        {/* Document Alignment Frame Guidelines */}
+                        <div className="absolute inset-8 pointer-events-none border border-white/20 rounded-2xl flex flex-col justify-between p-2">
+                          <div className="flex justify-between">
+                            <div className="w-6 h-6 border-t-2 border-l-2 border-money-400 rounded-tl"></div>
+                            <div className="w-6 h-6 border-t-2 border-r-2 border-money-400 rounded-tr"></div>
+                          </div>
+                          <div className="text-center">
+                            <span className="bg-black/60 backdrop-blur text-white text-xs font-medium px-3 py-1 rounded-full border border-white/10 shadow-lg">
+                              Align ledger or receipt in frame
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <div className="w-6 h-6 border-b-2 border-l-2 border-money-400 rounded-bl"></div>
+                            <div className="w-6 h-6 border-b-2 border-r-2 border-money-400 rounded-br"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Viewfinder Controls Bar */}
+                      <div className="w-full bg-shark-950/95 px-6 py-5 flex items-center justify-between border-t border-shark-800">
+                        {/* Switch Front/Back Camera */}
+                        <button
+                          type="button"
+                          onClick={toggleCameraFacing}
+                          className="p-3 bg-shark-800 hover:bg-shark-700 text-slate-200 rounded-full transition-colors flex items-center justify-center"
+                          title="Flip camera"
+                        >
+                          <Icons.SwitchCamera />
+                        </button>
+
+                        {/* Shutter Snap Button */}
+                        <button
+                          type="button"
+                          onClick={takePhotoSnap}
+                          className="relative p-1 rounded-full bg-money-500/30 hover:bg-money-500/40 active:scale-95 transition-transform"
+                          title="Take Photo Snap"
+                        >
+                          <div className="w-16 h-16 rounded-full border-4 border-white bg-money-500 flex items-center justify-center shadow-lg shadow-money-500/50">
+                            <div className="w-6 h-6 rounded-full bg-white"></div>
+                          </div>
+                        </button>
+
+                        {/* Close Camera Viewfinder */}
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="p-3 bg-shark-800 hover:bg-shark-700 text-slate-200 rounded-full transition-colors flex items-center justify-center"
+                          title="Close camera"
+                        >
+                          <Icons.X />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. Processing & Scanning Animation State */}
+                  {isAnalyzing && (
+                    <div className="bg-white dark:bg-shark-800 rounded-3xl p-8 border border-slate-200 dark:border-shark-700 text-center shadow-xl relative overflow-hidden">
+                      {scannedImage && (
+                        <div className="relative w-48 h-48 mx-auto rounded-2xl overflow-hidden border border-slate-300 dark:border-shark-600 mb-6 shadow-inner">
+                          <img src={scannedImage} alt="Scanning" className="w-full h-full object-cover opacity-70" />
+                          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-money-400 to-transparent shadow-[0_0_20px_#10b981] animate-pulse"></div>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <span className="animate-spin text-money-500"><Icons.Refresh /></span>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Gemini AI Analyzing Record</h3>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-shark-400 max-w-md mx-auto">
+                        Extracting customer name, principal amounts, transaction dates, and interest rates...
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 3. Camera Selection Hub (When camera is closed and not analyzing) */}
+                  {!isCameraActive && !isAnalyzing && (
+                    <div className="bg-white dark:bg-shark-800 rounded-3xl p-8 border border-slate-200 dark:border-shark-700 shadow-xl space-y-6">
+                      {cameraError && (
+                        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm flex items-start gap-3">
+                          <Icons.Lock />
+                          <div>
+                            <p className="font-semibold">Camera Notice</p>
+                            <p className="text-xs mt-0.5">{cameraError}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Primary Option: Live Snap */}
+                        <button
+                          type="button"
+                          onClick={() => startCamera('environment')}
+                          className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-money-500/40 bg-gradient-to-b from-money-500/10 to-transparent hover:from-money-500/20 hover:border-money-500 transition-all text-center group"
+                        >
+                          <div className="w-16 h-16 rounded-2xl bg-money-500/20 text-money-600 dark:text-money-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <Icons.Camera />
+                          </div>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Take Photo Snap</h4>
+                          <p className="text-xs text-slate-500 dark:text-shark-400">Launch live viewfinder using device camera</p>
+                        </button>
+
+                        {/* Secondary Option: File / Gallery Upload */}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-slate-200 dark:border-shark-700 bg-slate-50 dark:bg-shark-900/50 hover:border-slate-400 dark:hover:border-shark-500 transition-all text-center group"
+                        >
+                          <div className="w-16 h-16 rounded-2xl bg-slate-200 dark:bg-shark-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <Icons.Upload />
+                          </div>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Upload from Files</h4>
+                          <p className="text-xs text-slate-500 dark:text-shark-400">Choose an existing receipt photo or screenshot</p>
+                        </button>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex items-center gap-3 text-xs text-slate-500 dark:text-shark-400">
+                        <span className="text-money-500 text-base"><Icons.Sparkles /></span>
+                        <span>Powered by <strong>Google Gemini 2.5 Flash</strong> OCR engine for high-accuracy handwriting and paper ledger recognition.</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1023,14 +1247,27 @@ export default function App() {
                     <div className="mb-6 bg-slate-50 dark:bg-shark-900 p-4 rounded-xl border border-slate-200 dark:border-shark-700 flex gap-4 items-start">
                       <img src={scannedImage} alt="Reference" className="w-20 h-20 object-cover rounded-lg border border-slate-300 dark:border-shark-600" />
                       <div className="flex-1">
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Scanned Data</h4>
-                        <p className="text-xs text-slate-500 dark:text-shark-400 mb-2">The form has been pre-filled from your image.</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-money-500"><Icons.CheckCircle /></span>
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white">AI Scanned Record</h4>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-shark-400 mb-2">The form below was automatically populated from your camera snap.</p>
                         {scanClarification && (
-                          <div className="text-xs text-orange-600 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/20 p-2 rounded border border-orange-200 dark:border-orange-900/50">
-                            <strong>AI Note:</strong> {scanClarification}
+                          <div className="text-xs text-money-700 dark:text-money-300 bg-money-100/50 dark:bg-money-900/20 p-2 rounded border border-money-200 dark:border-money-900/50 mb-2">
+                            <strong>AI Summary:</strong> {scanClarification}
                           </div>
                         )}
-                        <button onClick={() => { setScannedImage(null); setEntryMode('scan'); }} className="text-xs text-money-600 dark:text-money-500 hover:underline mt-2">Scan different image</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScannedImage(null);
+                            setEntryMode('scan');
+                            startCamera('environment');
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs text-money-600 dark:text-money-500 hover:underline font-medium"
+                        >
+                          <Icons.RotateCcw /> Take another photo snap
+                        </button>
                       </div>
                     </div>
                   )}
