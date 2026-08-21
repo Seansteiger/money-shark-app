@@ -85,7 +85,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
   const [authOtpCode, setAuthOtpCode] = useState('');
-  const [authStep, setAuthStep] = useState<'credentials' | 'otp-verify'>('credentials');
+  const [authStep, setAuthStep] = useState<'credentials' | 'otp-signin' | 'otp-verify' | 'forgot-password' | 'reset-verify'>('credentials');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState('');
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
@@ -283,57 +283,102 @@ export default function App() {
 
     try {
       if (authStep === 'otp-verify') {
-        await signIn("password", {
-          email: authEmail,
+        // Verify Email OTP Sign-in code
+        await signIn("resend-otp", {
+          email: authEmail.trim().toLowerCase(),
           code: authOtpCode.trim(),
-          flow: "email-verification"
         });
         setAuthOtpCode('');
         setAuthStep('credentials');
-      } else if (isRegisterMode) {
+      } else if (authStep === 'reset-verify') {
+        // Verify Password Reset code and set new password
         await signIn("password", {
-          name: authName,
-          email: authEmail,
-          password: authPassword,
-          flow: "signUp"
+          email: authEmail.trim().toLowerCase(),
+          code: authOtpCode.trim(),
+          newPassword: authPassword,
+          flow: "reset-verification",
         });
-        // Transition to OTP verification step
-        setAuthStep('otp-verify');
-      } else {
+        setAuthOtpCode('');
+        setAuthPassword('');
+        setAuthStep('credentials');
+      } else if (isRegisterMode) {
+        // Create account and sign in immediately
         await signIn("password", {
-          email: authEmail,
+          name: authName.trim(),
+          email: authEmail.trim().toLowerCase(),
           password: authPassword,
-          flow: "signIn"
+          flow: "signUp",
+        });
+        setAuthPassword('');
+      } else {
+        // Standard Password Sign-in
+        await signIn("password", {
+          email: authEmail.trim().toLowerCase(),
+          password: authPassword,
+          flow: "signIn",
         });
         setAuthPassword('');
       }
     } catch (error: any) {
       const msg = error instanceof Error ? error.message : 'Authentication failed';
-      if (msg.toLowerCase().includes('verify') || msg.toLowerCase().includes('verification') || msg.toLowerCase().includes('code')) {
-        setAuthStep('otp-verify');
-      } else {
-        setAuthError(msg);
-      }
+      setAuthError(msg);
     } finally {
       setIsSubmittingAuth(false);
     }
   };
 
-  const handleResendOtp = async () => {
+  const handleSendEmailOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!authEmail.trim()) {
+      setAuthError('Please enter your email address');
+      return;
+    }
+    setAuthError('');
+    setResendStatus('');
+    setIsSubmittingAuth(true);
+    try {
+      await signIn("resend-otp", {
+        email: authEmail.trim().toLowerCase(),
+      });
+      setAuthStep('otp-verify');
+      setResendStatus(`We sent a 6-digit verification code to ${authEmail}`);
+    } catch (err: any) {
+      setAuthError(err instanceof Error ? err.message : 'Failed to send verification email');
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleSendPasswordReset = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!authEmail.trim()) {
+      setAuthError('Please enter your email address');
+      return;
+    }
     setAuthError('');
     setResendStatus('');
     setIsSubmittingAuth(true);
     try {
       await signIn("password", {
-        name: authName,
-        email: authEmail,
-        password: authPassword,
-        flow: "signUp"
+        email: authEmail.trim().toLowerCase(),
+        flow: "reset",
       });
-      setResendStatus('A new 6-digit verification code has been sent to your email.');
+      setAuthStep('reset-verify');
+      setResendStatus(`Password reset code sent to ${authEmail}`);
     } catch (err: any) {
-      setAuthError(err instanceof Error ? err.message : 'Failed to resend code');
+      setAuthError(err instanceof Error ? err.message : 'Failed to send reset code');
     } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleOAuthSignIn = async (provider: "google" | "github") => {
+    setAuthError('');
+    setIsSubmittingAuth(true);
+    try {
+      await signIn(provider);
+    } catch (err: any) {
+      setAuthError(err instanceof Error ? err.message : `${provider} sign in failed`);
       setIsSubmittingAuth(false);
     }
   };
@@ -682,10 +727,15 @@ export default function App() {
   );
 
   // --- Auth Render ---
-  if (authLoading) {
+  const isHandlingOAuthCallback = typeof window !== 'undefined' && window.location.search.includes('code=');
+
+  if (authLoading || isHandlingOAuthCallback) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-shark-900 text-white font-sans">
-        <div className="text-sm text-shark-300">Loading secure workspace...</div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-shark-900 text-white font-sans space-y-4">
+        <div className="w-12 h-12 border-4 border-money-500/20 border-t-money-500 rounded-full animate-spin"></div>
+        <div className="text-sm font-medium text-shark-300">
+          {isHandlingOAuthCallback ? 'Completing secure authentication...' : 'Loading secure workspace...'}
+        </div>
       </div>
     );
   }
@@ -693,18 +743,24 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-shark-900 text-white font-sans">
-        <div className="w-full max-w-md p-8 bg-shark-800 rounded-3xl shadow-2xl border border-shark-700 mx-4">
+        <div className="w-full max-w-md p-8 bg-shark-800 rounded-3xl shadow-2xl border border-shark-700 mx-4 animate-in fade-in zoom-in-95 duration-200">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold tracking-tight mb-2">
               <span className="text-money-500">Money</span>-Shark
             </h1>
             <p className="text-shark-400 text-sm uppercase tracking-widest">
-              {authStep === 'otp-verify' ? 'Email Verification' : 'Secure Access'}
+              {authStep === 'otp-signin' || authStep === 'otp-verify'
+                ? 'Email OTP Sign-In'
+                : authStep === 'forgot-password' || authStep === 'reset-verify'
+                ? 'Password Recovery'
+                : isRegisterMode
+                ? 'Create New Account'
+                : 'Secure Access'}
             </p>
           </div>
 
           {/* VIEW: EMAIL OTP VERIFICATION */}
-          {authStep === 'otp-verify' ? (
+          {authStep === 'otp-verify' && (
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="p-4 rounded-2xl bg-money-500/10 border border-money-500/20 text-center space-y-1">
                 <p className="text-xs text-slate-300">A 6-digit verification code was sent to:</p>
@@ -749,13 +805,13 @@ export default function App() {
                 ) : (
                   <Icons.CheckCircle />
                 )}
-                <span>Verify & Activate</span>
+                <span>Verify & Sign In</span>
               </button>
 
               <div className="flex items-center justify-between text-xs pt-2">
                 <button
                   type="button"
-                  onClick={handleResendOtp}
+                  onClick={handleSendEmailOtp}
                   disabled={isSubmittingAuth}
                   className="text-money-500 hover:text-money-400 hover:underline cursor-pointer"
                 >
@@ -770,29 +826,94 @@ export default function App() {
                   }}
                   className="text-shark-400 hover:text-white hover:underline cursor-pointer"
                 >
-                  Change Email / Back
+                  Use Password Instead
                 </button>
               </div>
             </form>
-          ) : (
-            /* VIEW: STANDARD LOGIN / SIGN UP */
+          )}
+
+          {/* VIEW: PASSWORD RESET VERIFICATION */}
+          {authStep === 'reset-verify' && (
             <form onSubmit={handleLogin} className="space-y-6">
-              {isRegisterMode && (
-                <div>
-                  <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    value={authName}
-                    onChange={(e) => setAuthName(e.target.value)}
-                    placeholder="e.g. Melville Doe"
-                    className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
-                    required
-                  />
+              <div className="p-4 rounded-2xl bg-money-500/10 border border-money-500/20 text-center space-y-1">
+                <p className="text-xs text-slate-300">Enter the 6-digit code sent to:</p>
+                <p className="text-sm font-bold text-money-400 font-mono">{authEmail}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2 text-center">
+                  6-Digit Reset Code
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={authOtpCode}
+                  onChange={(e) => setAuthOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="123456"
+                  className="w-full bg-shark-900 border-2 border-money-500/50 focus:border-money-400 rounded-xl p-4 text-center font-mono text-3xl font-bold tracking-[0.5em] text-white outline-none transition-all shadow-inner"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Enter new strong password"
+                  className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                  required
+                />
+              </div>
+
+              {resendStatus && (
+                <div className="text-emerald-400 text-xs text-center bg-emerald-900/20 p-3 rounded-lg border border-emerald-900/50">
+                  {resendStatus}
                 </div>
               )}
 
+              {authError && (
+                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth || authOtpCode.length < 6 || !authPassword}
+                className="w-full py-4 bg-money-600 hover:bg-money-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <span className="animate-spin"><Icons.Refresh /></span>
+                ) : (
+                  <Icons.CheckCircle />
+                )}
+                <span>Reset Password & Sign In</span>
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthStep('credentials');
+                    setAuthError('');
+                    setResendStatus('');
+                  }}
+                  className="text-xs text-shark-400 hover:text-white hover:underline cursor-pointer"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* VIEW: FORGOT PASSWORD REQUEST */}
+          {authStep === 'forgot-password' && (
+            <form onSubmit={handleSendPasswordReset} className="space-y-6">
               <div>
-                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Email</label>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Your Account Email</label>
                 <input
                   type="email"
                   value={authEmail}
@@ -802,32 +923,13 @@ export default function App() {
                   required
                   autoFocus
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Password</label>
-                <input
-                  type="password"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="••••••••••"
-                  className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
-                  required
-                />
-                {isRegisterMode && (
-                  <div className="text-xs text-shark-400 mt-2 space-y-1 bg-shark-900/50 p-3 rounded-lg border border-shark-700">
-                    <span className="block font-bold text-shark-500 uppercase text-[10px] mb-1">Password Requirements:</span>
-                    <span className={authPassword.length >= 10 ? 'text-green-400 block' : 'text-shark-400 block'}>• At least 10 characters</span>
-                    <span className={/[A-Z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one uppercase letter</span>
-                    <span className={/[a-z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one lowercase letter</span>
-                    <span className={/[0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one number</span>
-                    <span className={/[^A-Za-z0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one symbol</span>
-                  </div>
-                )}
+                <p className="text-xs text-shark-400 mt-2">
+                  We will send a 6-digit verification code to reset your password.
+                </p>
               </div>
 
               {authError && (
-                <div className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded-lg border border-red-900/50">
+                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
                   {authError}
                 </div>
               )}
@@ -842,13 +944,161 @@ export default function App() {
                 ) : (
                   <Icons.Unlock />
                 )}
-                <span>{isRegisterMode ? 'Send Verification Email' : 'Access System'}</span>
+                <span>Send Reset Code</span>
               </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthStep('credentials');
+                    setAuthError('');
+                    setResendStatus('');
+                  }}
+                  className="text-xs text-shark-400 hover:text-white hover:underline cursor-pointer"
+                >
+                  Back to Sign In
+                </button>
+              </div>
             </form>
           )}
 
+          {/* VIEW: PASSWORDLESS EMAIL OTP REQUEST */}
+          {authStep === 'otp-signin' && (
+            <form onSubmit={handleSendEmailOtp} className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Email Address</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-shark-400 mt-2">
+                  We will send an instant 6-digit sign-in code to your inbox. No password needed.
+                </p>
+              </div>
+
+              {authError && (
+                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full py-4 bg-money-600 hover:bg-money-500 disabled:opacity-60 text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <span className="animate-spin"><Icons.Refresh /></span>
+                ) : (
+                  <Icons.Unlock />
+                )}
+                <span>Send 6-Digit Code</span>
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthStep('credentials');
+                    setAuthError('');
+                  }}
+                  className="text-xs text-shark-400 hover:text-white hover:underline cursor-pointer"
+                >
+                  Sign in with Password instead
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* VIEW: STANDARD PASSWORD SIGN IN / REGISTRATION */}
           {authStep === 'credentials' && (
             <>
+              <form onSubmit={handleLogin} className="space-y-6">
+                {isRegisterMode && (
+                  <div>
+                    <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      value={authName}
+                      onChange={(e) => setAuthName(e.target.value)}
+                      placeholder="e.g. Melville Doe"
+                      className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                      required
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-shark-500 uppercase">Password</label>
+                    {!isRegisterMode && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthStep('forgot-password');
+                          setAuthError('');
+                        }}
+                        className="text-[11px] text-money-500 hover:text-money-400 hover:underline cursor-pointer"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••••"
+                    className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                    required
+                  />
+                  {isRegisterMode && (
+                    <div className="text-xs text-shark-400 mt-2 space-y-1 bg-shark-900/50 p-3 rounded-lg border border-shark-700">
+                      <span className="block font-bold text-shark-500 uppercase text-[10px] mb-1">Password Requirements:</span>
+                      <span className={authPassword.length >= 8 ? 'text-green-400 block' : 'text-shark-400 block'}>• At least 8 characters</span>
+                    </div>
+                  )}
+                </div>
+
+                {authError && (
+                  <div className="text-red-400 text-sm text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                    {authError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingAuth}
+                  className="w-full py-4 bg-money-600 hover:bg-money-500 disabled:opacity-60 text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmittingAuth ? (
+                    <span className="animate-spin"><Icons.Refresh /></span>
+                  ) : (
+                    <Icons.Unlock />
+                  )}
+                  <span>{isRegisterMode ? 'Create Account' : 'Access System'}</span>
+                </button>
+              </form>
+
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-shark-700/50"></div>
@@ -858,24 +1108,41 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <button
                   type="button"
-                  onClick={() => signIn("github")}
-                  className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200 cursor-pointer"
+                  onClick={() => handleOAuthSignIn("github")}
+                  disabled={isSubmittingAuth}
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
                 >
                   <Icons.GitHub /> GitHub
                 </button>
                 <button
                   type="button"
-                  onClick={() => signIn("google")}
-                  className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200 cursor-pointer"
+                  onClick={() => handleOAuthSignIn("google")}
+                  disabled={isSubmittingAuth}
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
                 >
                   <Icons.Google /> Google
                 </button>
               </div>
 
-              <div className="mt-6 text-center text-sm">
+              {!isRegisterMode && (
+                <div className="mb-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthStep('otp-signin');
+                      setAuthError('');
+                    }}
+                    className="text-xs text-money-500 hover:text-money-400 hover:underline cursor-pointer"
+                  >
+                    ✉️ Sign in with 6-Digit Email Code instead
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-4 text-center text-sm border-t border-shark-700/40 pt-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -884,7 +1151,7 @@ export default function App() {
                   }}
                   className="text-money-500 hover:text-money-400 cursor-pointer"
                 >
-                  {isRegisterMode ? 'Already have an account? Sign in' : 'No account? Create one with email verification'}
+                  {isRegisterMode ? 'Already have an account? Sign in' : 'No account? Create one'}
                 </button>
               </div>
             </>

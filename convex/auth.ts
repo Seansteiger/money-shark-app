@@ -4,9 +4,9 @@ import GitHub from "@auth/core/providers/github";
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
 
-export const ResendEmail = Email({
-  id: "resend",
-  name: "Resend",
+export const ResendOTP = Email({
+  id: "resend-otp",
+  name: "Resend OTP",
   maxAge: 60 * 15, // 15 minutes
   async sendVerificationRequest({ identifier: email, token }) {
     const apiKey = process.env.AUTH_RESEND_KEY;
@@ -32,7 +32,7 @@ export const ResendEmail = Email({
               <p style="color:#94A3B8;font-size:12px;margin-top:4px;">Capital Portfolio Security</p>
             </div>
             <div style="background:#1E293B;padding:24px;border-radius:12px;text-align:center;border:1px solid #334155;">
-              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Use the verification code below to verify and activate your account:</p>
+              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Use the verification code below to access your account:</p>
               <div style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#34D399;margin:12px 0;font-family:monospace;">${token}</div>
               <p style="color:#64748B;font-size:11px;margin:12px 0 0 0;">Valid for 15 minutes. Never share this code with anyone.</p>
             </div>
@@ -53,9 +53,9 @@ export const ResendEmail = Email({
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({
-      verify: ResendEmail,
-      reset: ResendEmail,
+      reset: ResendOTP,
     }),
+    ResendOTP,
     GitHub,
     Google,
   ],

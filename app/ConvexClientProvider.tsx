@@ -5,5 +5,16 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { convex } from "@/utils/convexClient";
 
 export default function ConvexClientProvider({ children }: { children: ReactNode }) {
-  return <ConvexAuthProvider client={convex}>{children}</ConvexAuthProvider>;
+  return (
+    <ConvexAuthProvider
+      client={convex}
+      replaceURL={(relativeUrl) => {
+        if (typeof window !== "undefined") {
+          window.history.replaceState(null, "", relativeUrl);
+        }
+      }}
+    >
+      {children}
+    </ConvexAuthProvider>
+  );
 }
