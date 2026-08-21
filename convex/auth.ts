@@ -8,6 +8,13 @@ export const ResendEmail = Email({
   id: "resend",
   name: "Resend",
   maxAge: 60 * 15, // 15 minutes
+  authorize: undefined, // Enable seamless magic link verification by token code
+  generateVerificationToken: () => {
+    // Generate strictly numeric 6-digit verification code
+    const min = 100000;
+    const max = 999999;
+    return Math.floor(min + Math.random() * (max - min + 1)).toString();
+  },
   async sendVerificationRequest({ identifier: email, token, url }) {
     const apiKey = process.env.AUTH_RESEND_KEY;
     if (!apiKey) {

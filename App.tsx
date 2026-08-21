@@ -88,8 +88,29 @@ export default function App() {
   const [authStep, setAuthStep] = useState<'credentials' | 'otp-signin' | 'otp-verify' | 'forgot-password' | 'reset-verify'>('credentials');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [resendStatus, setResendStatus] = useState('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [isUrlCodePending, setIsUrlCodePending] = useState(() => {
+    return typeof window !== 'undefined' && window.location.search.includes('code=');
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.search.includes('code=')) {
+      setIsUrlCodePending(true);
+      const timer = setTimeout(() => {
+        setIsUrlCodePending(false);
+        if (window.location.search.includes('code=')) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('code');
+          window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        }
+      }, 4000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsUrlCodePending(false);
+    }
+  }, [isAuthenticated]);
 
   // Reset Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -766,14 +787,12 @@ export default function App() {
   );
 
   // --- Auth Render ---
-  const isHandlingOAuthCallback = typeof window !== 'undefined' && window.location.search.includes('code=');
-
-  if (authLoading || isHandlingOAuthCallback) {
+  if (authLoading || (isUrlCodePending && !isAuthenticated)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-shark-900 text-white font-sans space-y-4">
         <div className="w-12 h-12 border-4 border-money-500/20 border-t-money-500 rounded-full animate-spin"></div>
         <div className="text-sm font-medium text-shark-300">
-          {isHandlingOAuthCallback ? 'Completing secure authentication...' : 'Loading secure workspace...'}
+          {isUrlCodePending ? 'Verifying authentication...' : 'Loading secure workspace...'}
         </div>
       </div>
     );
