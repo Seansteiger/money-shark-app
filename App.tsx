@@ -84,8 +84,12 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  const [authOtpCode, setAuthOtpCode] = useState('');
+  const [authStep, setAuthStep] = useState<'credentials' | 'otp-verify'>('credentials');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [resendStatus, setResendStatus] = useState('');
 
   // Reset Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -274,19 +278,63 @@ export default function App() {
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setAuthError('');
+    setResendStatus('');
+    setIsSubmittingAuth(true);
 
     try {
-      if (isRegisterMode) {
-        await signIn("password", { name: authName, email: authEmail, password: authPassword, flow: "signUp" });
+      if (authStep === 'otp-verify') {
+        await signIn("password", {
+          email: authEmail,
+          code: authOtpCode.trim(),
+          flow: "email-verification"
+        });
+        setAuthOtpCode('');
+        setAuthStep('credentials');
+      } else if (isRegisterMode) {
+        await signIn("password", {
+          name: authName,
+          email: authEmail,
+          password: authPassword,
+          flow: "signUp"
+        });
+        // Transition to OTP verification step
+        setAuthStep('otp-verify');
       } else {
-        await signIn("password", { email: authEmail, password: authPassword, flow: "signIn" });
+        await signIn("password", {
+          email: authEmail,
+          password: authPassword,
+          flow: "signIn"
+        });
+        setAuthPassword('');
       }
-      setAuthPassword('');
-      setAuthEmail('');
-      setAuthName('');
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Authentication failed');
-      setAuthPassword('');
+    } catch (error: any) {
+      const msg = error instanceof Error ? error.message : 'Authentication failed';
+      if (msg.toLowerCase().includes('verify') || msg.toLowerCase().includes('verification') || msg.toLowerCase().includes('code')) {
+        setAuthStep('otp-verify');
+      } else {
+        setAuthError(msg);
+      }
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setAuthError('');
+    setResendStatus('');
+    setIsSubmittingAuth(true);
+    try {
+      await signIn("password", {
+        name: authName,
+        email: authEmail,
+        password: authPassword,
+        flow: "signUp"
+      });
+      setResendStatus('A new 6-digit verification code has been sent to your email.');
+    } catch (err: any) {
+      setAuthError(err instanceof Error ? err.message : 'Failed to resend code');
+    } finally {
+      setIsSubmittingAuth(false);
     }
   };
 
@@ -650,119 +698,197 @@ export default function App() {
             <h1 className="text-3xl font-bold tracking-tight mb-2">
               <span className="text-money-500">Money</span>-Shark
             </h1>
-            <p className="text-shark-400 text-sm uppercase tracking-widest">Secure Access</p>
+            <p className="text-shark-400 text-sm uppercase tracking-widest">
+              {authStep === 'otp-verify' ? 'Email Verification' : 'Secure Access'}
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            {isRegisterMode && (
+          {/* VIEW: EMAIL OTP VERIFICATION */}
+          {authStep === 'otp-verify' ? (
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="p-4 rounded-2xl bg-money-500/10 border border-money-500/20 text-center space-y-1">
+                <p className="text-xs text-slate-300">A 6-digit verification code was sent to:</p>
+                <p className="text-sm font-bold text-money-400 font-mono">{authEmail}</p>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Full Name</label>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2 text-center">
+                  Enter 6-Digit Code
+                </label>
                 <input
                   type="text"
-                  value={authName}
-                  onChange={(e) => setAuthName(e.target.value)}
-                  placeholder="e.g. Melville Doe"
+                  maxLength={6}
+                  value={authOtpCode}
+                  onChange={(e) => setAuthOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="123456"
+                  className="w-full bg-shark-900 border-2 border-money-500/50 focus:border-money-400 rounded-xl p-4 text-center font-mono text-3xl font-bold tracking-[0.5em] text-white outline-none transition-all shadow-inner"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {resendStatus && (
+                <div className="text-emerald-400 text-xs text-center bg-emerald-900/20 p-3 rounded-lg border border-emerald-900/50">
+                  {resendStatus}
+                </div>
+              )}
+
+              {authError && (
+                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth || authOtpCode.length < 6}
+                className="w-full py-4 bg-money-600 hover:bg-money-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <span className="animate-spin"><Icons.Refresh /></span>
+                ) : (
+                  <Icons.CheckCircle />
+                )}
+                <span>Verify & Activate</span>
+              </button>
+
+              <div className="flex items-center justify-between text-xs pt-2">
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isSubmittingAuth}
+                  className="text-money-500 hover:text-money-400 hover:underline cursor-pointer"
+                >
+                  Resend Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthStep('credentials');
+                    setAuthError('');
+                    setResendStatus('');
+                  }}
+                  className="text-shark-400 hover:text-white hover:underline cursor-pointer"
+                >
+                  Change Email / Back
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* VIEW: STANDARD LOGIN / SIGN UP */
+            <form onSubmit={handleLogin} className="space-y-6">
+              {isRegisterMode && (
+                <div>
+                  <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Full Name</label>
+                  <input
+                    type="text"
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    placeholder="e.g. Melville Doe"
+                    className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Email</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Password</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••••"
                   className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
                   required
                 />
+                {isRegisterMode && (
+                  <div className="text-xs text-shark-400 mt-2 space-y-1 bg-shark-900/50 p-3 rounded-lg border border-shark-700">
+                    <span className="block font-bold text-shark-500 uppercase text-[10px] mb-1">Password Requirements:</span>
+                    <span className={authPassword.length >= 10 ? 'text-green-400 block' : 'text-shark-400 block'}>• At least 10 characters</span>
+                    <span className={/[A-Z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one uppercase letter</span>
+                    <span className={/[a-z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one lowercase letter</span>
+                    <span className={/[0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one number</span>
+                    <span className={/[^A-Za-z0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one symbol</span>
+                  </div>
+                )}
               </div>
-            )}
 
-            <div>
-              <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Email</label>
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
-                required
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-shark-500 uppercase mb-2">Password</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••••"
-                className="w-full bg-shark-900 border border-shark-600 rounded-xl p-4 text-white focus:border-money-500 outline-none transition-colors"
-                required
-              />
-              {isRegisterMode && (
-                <div className="text-xs text-shark-400 mt-2 space-y-1 bg-shark-900/50 p-3 rounded-lg border border-shark-700">
-                  <span className="block font-bold text-shark-500 uppercase text-[10px] mb-1">Password Requirements:</span>
-                  <span className={authPassword.length >= 10 ? 'text-green-400 block' : 'text-shark-400 block'}>• At least 10 characters</span>
-                  <span className={/[A-Z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one uppercase letter</span>
-                  <span className={/[a-z]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one lowercase letter</span>
-                  <span className={/[0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one number</span>
-                  <span className={/[^A-Za-z0-9]/.test(authPassword) ? 'text-green-400 block' : 'text-shark-400 block'}>• At least one symbol</span>
+              {authError && (
+                <div className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded-lg border border-red-900/50">
+                  {authError}
                 </div>
               )}
-            </div>
 
-            {authError && (
-              <div className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded-lg border border-red-900/50">
-                {authError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-4 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2"
-            >
-              <Icons.Unlock /> {isRegisterMode ? 'Create Account' : 'Access System'}
-            </button>
-          </form>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-shark-700/50"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-shark-800 px-2 text-shark-400">Or continue with</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button
-              type="button"
-              onClick={() => signIn("github")}
-              className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200"
-            >
-              <Icons.GitHub /> GitHub
-            </button>
-            <button
-              type="button"
-              onClick={() => signIn("google")}
-              className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200"
-            >
-              <Icons.Google /> Google
-            </button>
-          </div>
-
-          {!isRegisterMode && (
-            <div className="mt-8 p-4 bg-shark-900/50 border border-shark-700 rounded-2xl text-center">
-              <p className="text-xs text-shark-400">
-                Or sign up a new account using any email and password above.
-              </p>
-            </div>
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full py-4 bg-money-600 hover:bg-money-500 disabled:opacity-60 text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isSubmittingAuth ? (
+                  <span className="animate-spin"><Icons.Refresh /></span>
+                ) : (
+                  <Icons.Unlock />
+                )}
+                <span>{isRegisterMode ? 'Send Verification Email' : 'Access System'}</span>
+              </button>
+            </form>
           )}
 
-          <div className="mt-6 text-center text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegisterMode((prev) => !prev);
-                setAuthError('');
-              }}
-              className="text-money-500 hover:text-money-400"
-            >
-              {isRegisterMode ? 'Already have an account? Sign in' : 'No account? Create one'}
-            </button>
-          </div>
+          {authStep === 'credentials' && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-shark-700/50"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-shark-800 px-2 text-shark-400">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <button
+                  type="button"
+                  onClick={() => signIn("github")}
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200 cursor-pointer"
+                >
+                  <Icons.GitHub /> GitHub
+                </button>
+                <button
+                  type="button"
+                  onClick={() => signIn("google")}
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-shark-900 hover:bg-shark-950 border border-shark-700 rounded-xl text-white font-medium text-sm transition-all duration-200 cursor-pointer"
+                >
+                  <Icons.Google /> Google
+                </button>
+              </div>
+
+              <div className="mt-6 text-center text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegisterMode((prev) => !prev);
+                    setAuthError('');
+                  }}
+                  className="text-money-500 hover:text-money-400 cursor-pointer"
+                >
+                  {isRegisterMode ? 'Already have an account? Sign in' : 'No account? Create one with email verification'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
