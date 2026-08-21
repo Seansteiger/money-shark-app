@@ -283,8 +283,8 @@ export default function App() {
 
     try {
       if (authStep === 'otp-verify') {
-        // Verify Email OTP Sign-in code
-        await signIn("resend-otp", {
+        // Verify 6-digit email code
+        await signIn("resend", {
           email: authEmail.trim().toLowerCase(),
           code: authOtpCode.trim(),
         });
@@ -302,14 +302,13 @@ export default function App() {
         setAuthPassword('');
         setAuthStep('credentials');
       } else if (isRegisterMode) {
-        // Create account and sign in immediately
-        await signIn("password", {
-          name: authName.trim(),
+        // Registration: Send verification email with 6-digit code + verify button
+        await signIn("resend", {
           email: authEmail.trim().toLowerCase(),
-          password: authPassword,
-          flow: "signUp",
+          name: authName.trim(),
         });
-        setAuthPassword('');
+        setAuthStep('otp-verify');
+        setResendStatus(`Verification email sent to ${authEmail}`);
       } else {
         // Standard Password Sign-in
         await signIn("password", {
@@ -337,11 +336,11 @@ export default function App() {
     setResendStatus('');
     setIsSubmittingAuth(true);
     try {
-      await signIn("resend-otp", {
+      await signIn("resend", {
         email: authEmail.trim().toLowerCase(),
       });
       setAuthStep('otp-verify');
-      setResendStatus(`We sent a 6-digit verification code to ${authEmail}`);
+      setResendStatus(`Verification email sent to ${authEmail}`);
     } catch (err: any) {
       setAuthError(err instanceof Error ? err.message : 'Failed to send verification email');
     } finally {
@@ -759,12 +758,18 @@ export default function App() {
             </p>
           </div>
 
-          {/* VIEW: EMAIL OTP VERIFICATION */}
+          {/* VIEW: EMAIL OTP / HYBRID VERIFICATION */}
           {authStep === 'otp-verify' && (
             <form onSubmit={handleLogin} className="space-y-6">
-              <div className="p-4 rounded-2xl bg-money-500/10 border border-money-500/20 text-center space-y-1">
-                <p className="text-xs text-slate-300">A 6-digit verification code was sent to:</p>
+              <div className="p-4 rounded-2xl bg-money-500/10 border border-money-500/20 text-center space-y-1.5">
+                <div className="w-10 h-10 rounded-full bg-money-500/20 text-money-400 flex items-center justify-center mx-auto mb-2">
+                  <Icons.Unlock />
+                </div>
+                <p className="text-xs text-slate-300">We sent a verification email to:</p>
                 <p className="text-sm font-bold text-money-400 font-mono">{authEmail}</p>
+                <p className="text-[11px] text-slate-400 pt-1">
+                  You can enter the 6-digit code below <strong>or</strong> click the <strong>Verify & Sign In</strong> button in the email.
+                </p>
               </div>
 
               <div>
@@ -805,7 +810,7 @@ export default function App() {
                 ) : (
                   <Icons.CheckCircle />
                 )}
-                <span>Verify & Sign In</span>
+                <span>Verify Code & Sign In</span>
               </button>
 
               <div className="flex items-center justify-between text-xs pt-2">
@@ -815,7 +820,7 @@ export default function App() {
                   disabled={isSubmittingAuth}
                   className="text-money-500 hover:text-money-400 hover:underline cursor-pointer"
                 >
-                  Resend Code
+                  Resend Email
                 </button>
                 <button
                   type="button"
@@ -826,7 +831,7 @@ export default function App() {
                   }}
                   className="text-shark-400 hover:text-white hover:underline cursor-pointer"
                 >
-                  Use Password Instead
+                  Back to Sign In
                 </button>
               </div>
             </form>

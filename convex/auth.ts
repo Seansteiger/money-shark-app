@@ -4,11 +4,11 @@ import GitHub from "@auth/core/providers/github";
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
 
-export const ResendOTP = Email({
-  id: "resend-otp",
-  name: "Resend OTP",
+export const ResendEmail = Email({
+  id: "resend",
+  name: "Resend",
   maxAge: 60 * 15, // 15 minutes
-  async sendVerificationRequest({ identifier: email, token }) {
+  async sendVerificationRequest({ identifier: email, token, url }) {
     const apiKey = process.env.AUTH_RESEND_KEY;
     if (!apiKey) {
       console.error("AUTH_RESEND_KEY is missing from environment");
@@ -24,19 +24,34 @@ export const ResendOTP = Email({
       body: JSON.stringify({
         from: "Money Shark <auth@steigeronline.co.za>",
         to: email,
-        subject: `Money Shark Verification Code: ${token}`,
+        subject: `Your Money Shark Verification Code: ${token}`,
         html: `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0F172A;color:#E2E8F0;padding:32px;border-radius:16px;max-width:480px;margin:0 auto;">
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0F172A;color:#E2E8F0;padding:36px 24px;border-radius:16px;max-width:500px;margin:0 auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <div style="text-align:center;margin-bottom:28px;">
+              <h1 style="color:#FFFFFF;margin:0;font-size:24px;letter-spacing:-0.5px;">
+                <span style="color:#10B981;">Money</span>-Shark
+              </h1>
+              <p style="color:#94A3B8;font-size:12px;margin-top:6px;letter-spacing:1px;text-transform:uppercase;">Account Verification</p>
+            </div>
+
+            <div style="background:#1E293B;padding:24px;border-radius:12px;text-align:center;border:1px solid #334155;margin-bottom:24px;">
+              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Option 1: Enter your 6-digit verification code</p>
+              <div style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#34D399;margin:12px 0;font-family:monospace;">${token}</div>
+              <p style="color:#64748B;font-size:11px;margin:8px 0 0 0;">Valid for 15 minutes.</p>
+            </div>
+
             <div style="text-align:center;margin-bottom:24px;">
-              <h1 style="color:#FFFFFF;margin:0;font-size:22px;"><span style="color:#10B981;">Money</span>-Shark</h1>
-              <p style="color:#94A3B8;font-size:12px;margin-top:4px;">Capital Portfolio Security</p>
+              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Option 2: 1-Click Instant Sign-In</p>
+              <a href="${url}" style="display:inline-block;background:#10B981;color:#FFFFFF;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px;box-shadow:0 4px 14px rgba(16,185,129,0.4);">
+                Verify & Sign In Directly →
+              </a>
             </div>
-            <div style="background:#1E293B;padding:24px;border-radius:12px;text-align:center;border:1px solid #334155;">
-              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Use the verification code below to access your account:</p>
-              <div style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#34D399;margin:12px 0;font-family:monospace;">${token}</div>
-              <p style="color:#64748B;font-size:11px;margin:12px 0 0 0;">Valid for 15 minutes. Never share this code with anyone.</p>
+
+            <div style="border-top:1px solid #334155;padding-top:16px;text-align:center;">
+              <p style="color:#64748B;font-size:11px;margin:0;">
+                If you did not request this email, you can safely ignore it.
+              </p>
             </div>
-            <p style="color:#64748B;font-size:11px;text-align:center;margin-top:24px;">If you did not request this email, please ignore it.</p>
           </div>
         `,
       }),
@@ -53,9 +68,9 @@ export const ResendOTP = Email({
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({
-      reset: ResendOTP,
+      reset: ResendEmail,
     }),
-    ResendOTP,
+    ResendEmail,
     GitHub,
     Google,
   ],
