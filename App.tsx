@@ -151,6 +151,7 @@ export default function App() {
   const [isRegisteringPasskey, setIsRegisteringPasskey] = useState(false);
   const [passkeyActionStatus, setPasskeyActionStatus] = useState('');
   const [passkeyActionError, setPasskeyActionError] = useState('');
+  const [showBiometricOnboardingModal, setShowBiometricOnboardingModal] = useState(false);
 
   // Check hardware biometric availability on load
   useEffect(() => {
@@ -165,6 +166,28 @@ export default function App() {
       setIsAppShieldLocked(true);
     }
   }, [settings.isBiometricLockEnabled]);
+
+  // Prompt user to enable biometrics upon registration or entry
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isAuthenticated && isDeviceBiometricAvailable) {
+      const justRegistered = sessionStorage.getItem('ms_just_registered') === 'true';
+      const dismissed = localStorage.getItem('ms_biometric_prompt_dismissed') === 'true';
+      const hasPasskey = getLocalBiometricState().enabled || (passkeysList && passkeysList.length > 0);
+
+      if ((justRegistered || !dismissed) && !hasPasskey && !settings.isBiometricLockEnabled) {
+        setShowBiometricOnboardingModal(true);
+      }
+    }
+  }, [isAuthenticated, isDeviceBiometricAvailable, passkeysList, settings.isBiometricLockEnabled]);
+
+  const handleDismissBiometricOnboarding = () => {
+    setShowBiometricOnboardingModal(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ms_biometric_prompt_dismissed', 'true');
+      sessionStorage.removeItem('ms_just_registered');
+    }
+  };
 
   // 1. Instant On-Device IndexedDB Hydration (0ms load)
   useEffect(() => {
@@ -358,6 +381,9 @@ export default function App() {
             code: authOtpCode.trim(),
           });
         }
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('ms_just_registered', 'true');
+        }
         setAuthOtpCode('');
         setAuthStep('credentials');
       } else if (authStep === 'reset-verify') {
@@ -379,6 +405,9 @@ export default function App() {
           password: authPassword,
           flow: "signUp",
         });
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('ms_just_registered', 'true');
+        }
         setAuthStep('otp-verify');
         setResendStatus(`Verification email sent to ${authEmail}`);
       } else {
@@ -580,6 +609,11 @@ export default function App() {
         saveLocalBiometricState(true, res.credentialId);
         setSettings((prev) => ({ ...prev, isBiometricLockEnabled: true }));
         setTempSettings((prev) => ({ ...prev, isBiometricLockEnabled: true }));
+        setShowBiometricOnboardingModal(false);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ms_biometric_prompt_dismissed', 'true');
+          sessionStorage.removeItem('ms_just_registered');
+        }
         setPasskeyActionStatus(`Enrolled ${res.deviceName} successfully!`);
         setTimeout(() => setPasskeyActionStatus(''), 4000);
       }
@@ -2421,10 +2455,75 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowIosInstallModal(false)}
-              className="w-full py-3 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-money-900/30"
+              className="w-full py-3 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-money-900/30 cursor-pointer"
             >
               Got It
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* BIOMETRIC ENROLLMENT ONBOARDING PROMPT MODAL */}
+      {showBiometricOnboardingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-shark-900 border border-money-500/30 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            {/* Glowing Accent */}
+            <div className="absolute -top-12 -left-12 w-32 h-32 bg-money-500/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-2xl bg-money-500/20 animate-ping opacity-30"></div>
+              <div className="w-20 h-20 rounded-2xl bg-money-500/20 border border-money-500/40 flex items-center justify-center text-money-500 dark:text-money-400 shadow-lg shadow-money-500/20">
+                <Icons.Fingerprint />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Enable Biometric Security?</h3>
+              <p className="text-xs text-slate-500 dark:text-shark-400 mt-2 leading-relaxed">
+                Protect your capital records with <strong>Face ID</strong>, <strong>Touch ID</strong>, or <strong>Windows Hello</strong> for instant, 1-tap zero-password access.
+              </p>
+            </div>
+
+            {passkeyActionError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs text-center font-medium">
+                {passkeyActionError}
+              </div>
+            )}
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleRegisterDevicePasskey}
+                disabled={isRegisteringPasskey}
+                className="w-full py-3.5 bg-gradient-to-r from-money-600 to-emerald-600 hover:from-money-500 hover:to-emerald-500 active:scale-[0.98] text-white rounded-xl font-bold text-sm shadow-xl shadow-money-900/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isRegisteringPasskey ? (
+                  <>
+                    <span className="animate-spin"><Icons.Refresh /></span>
+                    <span>Enrolling Biometrics...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icons.Fingerprint />
+                    <span>Enable Biometric Passkey</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDismissBiometricOnboarding}
+                className="w-full py-2.5 bg-transparent hover:bg-slate-100 dark:hover:bg-shark-800 text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Maybe Later
+              </button>
+            </div>
+
+            <div className="text-[10px] text-slate-400 dark:text-shark-500 flex items-center justify-center gap-1 pt-1">
+              <Icons.Shield />
+              <span>You can always toggle this later in Settings.</span>
+            </div>
           </div>
         </div>
       )}
