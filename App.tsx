@@ -286,6 +286,7 @@ export default function App() {
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [isStandaloneApp, setIsStandaloneApp] = useState(false);
   const [showIosInstallModal, setShowIosInstallModal] = useState(false);
+  const [iosInstallTab, setIosInstallTab] = useState<'profile' | 'safari'>('profile');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -2423,41 +2424,110 @@ export default function App() {
         </button>
       </nav>
 
-      {/* iOS PWA INSTALL INSTRUCTIONS MODAL */}
+      {/* iOS PWA & PROFILE INSTALL MODAL */}
       {showIosInstallModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white dark:bg-shark-900 border border-slate-200 dark:border-shark-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 rounded-2xl bg-money-500/20 text-money-600 dark:text-money-400 flex items-center justify-center mx-auto shadow-inner">
               <Icons.Smartphone />
             </div>
+
             <div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">Install on iPhone / iPad</h3>
-              <p className="text-xs text-slate-500 dark:text-shark-400 mt-1">Install Money Shark as a native full-screen app on your home screen.</p>
+              <p className="text-xs text-slate-500 dark:text-shark-400 mt-1">Get full-screen native access right from your home screen.</p>
             </div>
 
-            <div className="space-y-3 text-left bg-slate-50 dark:bg-shark-800/60 p-4 rounded-2xl border border-slate-200 dark:border-shark-700 text-xs">
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">1</span>
-                <div>
-                  <p className="font-semibold text-slate-900 dark:text-white">Tap the Share Button</p>
-                  <p className="text-slate-500 dark:text-shark-400">At the bottom bar in Safari, tap the <strong>Share</strong> icon (square with arrow pointing up).</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">2</span>
-                <div>
-                  <p className="font-semibold text-slate-900 dark:text-white">Add to Home Screen</p>
-                  <p className="text-slate-500 dark:text-shark-400">Scroll down the menu and tap <strong>"Add to Home Screen"</strong>.</p>
-                </div>
-              </div>
+            {/* Method Switcher Tabs */}
+            <div className="flex rounded-xl bg-slate-100 dark:bg-shark-800 p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setIosInstallTab('profile')}
+                className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                  iosInstallTab === 'profile'
+                    ? 'bg-money-600 text-white shadow-md'
+                    : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                ⚡ 1-Tap Profile (Fast)
+              </button>
+              <button
+                type="button"
+                onClick={() => setIosInstallTab('safari')}
+                className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                  iosInstallTab === 'safari'
+                    ? 'bg-money-600 text-white shadow-md'
+                    : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                📤 Safari Share
+              </button>
             </div>
+
+            {/* TAB 1: 1-TAP APPLE PROFILE */}
+            {iosInstallTab === 'profile' && (
+              <div className="space-y-4 text-left">
+                <div className="space-y-3 bg-slate-50 dark:bg-shark-800/60 p-4 rounded-2xl border border-slate-200 dark:border-shark-700 text-xs">
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">1</span>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">Download Profile</p>
+                      <p className="text-slate-500 dark:text-shark-400">Tap the button below and tap <strong>"Allow"</strong> when prompted.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">2</span>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">Open iPhone Settings</p>
+                      <p className="text-slate-500 dark:text-shark-400">Open <strong>Settings</strong> ➔ Tap <strong>"Profile Downloaded"</strong> at the top.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">3</span>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">Tap Install</p>
+                      <p className="text-slate-500 dark:text-shark-400">Tap <strong>Install</strong> in the top right corner. The app appears on your Home Screen!</p>
+                    </div>
+                  </div>
+                </div>
+
+                <a
+                  href="/api/ios-profile"
+                  download="MoneyShark.mobileconfig"
+                  className="w-full py-3.5 bg-gradient-to-r from-money-600 to-emerald-600 hover:from-money-500 hover:to-emerald-500 active:scale-[0.98] text-white rounded-xl font-bold text-sm shadow-lg shadow-money-900/30 transition-all flex items-center justify-center gap-2 text-center"
+                >
+                  <span>⚡ Download 1-Tap App Profile</span>
+                </a>
+              </div>
+            )}
+
+            {/* TAB 2: SAFARI SHARE MENU */}
+            {iosInstallTab === 'safari' && (
+              <div className="space-y-4 text-left">
+                <div className="space-y-3 bg-slate-50 dark:bg-shark-800/60 p-4 rounded-2xl border border-slate-200 dark:border-shark-700 text-xs">
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">1</span>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">Tap the Share Button</p>
+                      <p className="text-slate-500 dark:text-shark-400">At the bottom bar in Safari, tap the <strong>Share</strong> icon (square with arrow pointing up).</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-money-500/20 text-money-600 dark:text-money-400 font-bold flex items-center justify-center shrink-0">2</span>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">Add to Home Screen</p>
+                      <p className="text-slate-500 dark:text-shark-400">Scroll down the menu and tap <strong>"Add to Home Screen"</strong>.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               type="button"
               onClick={() => setShowIosInstallModal(false)}
-              className="w-full py-3 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-money-900/30 cursor-pointer"
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-shark-800 dark:hover:bg-shark-700 text-slate-700 dark:text-shark-300 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
             >
-              Got It
+              Close
             </button>
           </div>
         </div>
