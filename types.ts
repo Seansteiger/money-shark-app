@@ -26,6 +26,14 @@ export interface AppSettings {
   globalInitialInterestRate: number;
   globalInterestRate: number;
   globalCompoundMonthly: boolean;
+  isBiometricLockEnabled?: boolean;
+}
+
+export interface UserPasskey {
+  id: string;
+  credentialId: string;
+  deviceName: string;
+  createdAt: number;
 }
 
 export interface ScannedData {

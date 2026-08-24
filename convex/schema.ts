@@ -10,6 +10,7 @@ export default defineSchema({
     globalInitialInterestRate: v.number(),
     globalInterestRate: v.number(),
     globalCompoundMonthly: v.boolean(),
+    isBiometricLockEnabled: v.optional(v.boolean()),
   }).index("by_userId", ["userId"]),
 
   customers: defineTable({
@@ -30,4 +31,11 @@ export default defineSchema({
     status: v.union(v.literal("ACTIVE"), v.literal("PAID"), v.literal("DEFAULTED")),
     notes: v.optional(v.string()),
   }).index("by_userId", ["userId"]),
+
+  passkeys: defineTable({
+    userId: v.id("users"),
+    credentialId: v.string(),
+    deviceName: v.string(),
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"]).index("by_credentialId", ["credentialId"]),
 });

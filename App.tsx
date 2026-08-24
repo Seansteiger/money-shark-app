@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from './convex/_generated/api';
 
-import { Customer, Loan, InterestType, AppSettings } from './types';
+import { Customer, Loan, InterestType, AppSettings, UserPasskey } from './types';
+import {
+  isBiometricSupported,
+  registerDevicePasskey,
+  authenticateWithBiometrics,
+  saveLocalBiometricState,
+  getLocalBiometricState,
+} from './utils/webauthn';
 import { calculateLoanDetails, formatCurrency, formatDate } from './utils/calculations';
 import {
   createLoan,
@@ -57,12 +64,16 @@ const Icons = {
   CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>,
   Smartphone: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
   Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
+  Fingerprint: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>,
+  Shield: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>,
+  Key: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21 2-2 2m-1.5 1.5L14 9l-1.5-1.5L11 9l-1.5-1.5L8 9c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5c0-.64-.13-1.25-.35-1.81L21 4V2z"/><circle cx="7.5" cy="14.5" r="1.5"/></svg>,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
   globalInitialInterestRate: 50,
   globalInterestRate: 30,
   globalCompoundMonthly: true,
+  isBiometricLockEnabled: false,
 };
 
 
@@ -124,6 +135,36 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isDeviceHydrated, setIsDeviceHydrated] = useState(false);
   const liveData = useQuery(api.bootstrap.get, isAuthenticated ? undefined : "skip");
+
+  // Passkeys & Biometric Security State
+  const passkeysList = useQuery(api.passkeys.list, isAuthenticated ? undefined : "skip");
+  const savePasskeyMutation = useMutation(api.passkeys.savePasskey);
+  const removePasskeyMutation = useMutation(api.passkeys.removePasskey);
+
+  const [isDeviceBiometricAvailable, setIsDeviceBiometricAvailable] = useState(false);
+  const [isAppShieldLocked, setIsAppShieldLocked] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return getLocalBiometricState().enabled;
+  });
+  const [biometricAuthError, setBiometricAuthError] = useState('');
+  const [isVerifyingBiometric, setIsVerifyingBiometric] = useState(false);
+  const [isRegisteringPasskey, setIsRegisteringPasskey] = useState(false);
+  const [passkeyActionStatus, setPasskeyActionStatus] = useState('');
+  const [passkeyActionError, setPasskeyActionError] = useState('');
+
+  // Check hardware biometric availability on load
+  useEffect(() => {
+    isBiometricSupported().then((supported) => {
+      setIsDeviceBiometricAvailable(supported);
+    });
+  }, []);
+
+  // Update biometric lock if settings dictate and auto-trigger verification
+  useEffect(() => {
+    if (settings.isBiometricLockEnabled) {
+      setIsAppShieldLocked(true);
+    }
+  }, [settings.isBiometricLockEnabled]);
 
   // 1. Instant On-Device IndexedDB Hydration (0ms load)
   useEffect(() => {
@@ -492,11 +533,89 @@ export default function App() {
       setSettings(saved);
       setTempSettings(saved);
 
+      // Mirror biometric setting locally
+      if (tempSettings.isBiometricLockEnabled !== undefined) {
+        saveLocalBiometricState(tempSettings.isBiometricLockEnabled);
+      }
+
       setSettingsSuccess(true);
       setTimeout(() => setSettingsSuccess(false), 3000);
     } catch (err) {
       console.error("Failed to save settings", err);
       alert("Failed to save settings to database.");
+    }
+  };
+
+  // --- Biometric & Passkey Handlers ---
+  const handleUnlockWithBiometrics = async () => {
+    setBiometricAuthError('');
+    setIsVerifyingBiometric(true);
+    try {
+      const local = getLocalBiometricState();
+      await authenticateWithBiometrics(local.credentialId || undefined);
+      setIsAppShieldLocked(false);
+    } catch (err: any) {
+      console.warn("Biometric unlock failed:", err);
+      setBiometricAuthError(err.message || 'Biometric verification failed. Please try again.');
+    } finally {
+      setIsVerifyingBiometric(false);
+    }
+  };
+
+  const handleRegisterDevicePasskey = async () => {
+    setPasskeyActionError('');
+    setPasskeyActionStatus('');
+    setIsRegisteringPasskey(true);
+    try {
+      const res = await registerDevicePasskey(
+        authEmail || 'user_portfolio',
+        authEmail || 'user@example.com',
+        authName || 'Money Shark Admin'
+      );
+      if (res) {
+        await savePasskeyMutation({
+          credentialId: res.credentialId,
+          deviceName: res.deviceName,
+        });
+        saveLocalBiometricState(true, res.credentialId);
+        setSettings((prev) => ({ ...prev, isBiometricLockEnabled: true }));
+        setTempSettings((prev) => ({ ...prev, isBiometricLockEnabled: true }));
+        setPasskeyActionStatus(`Enrolled ${res.deviceName} successfully!`);
+        setTimeout(() => setPasskeyActionStatus(''), 4000);
+      }
+    } catch (err: any) {
+      console.warn("Passkey registration failed:", err);
+      setPasskeyActionError(err.message || 'Could not create device passkey.');
+    } finally {
+      setIsRegisteringPasskey(false);
+    }
+  };
+
+  const handleRemovePasskey = async (id: any) => {
+    if (!confirm("Are you sure you want to remove this device passkey?")) return;
+    try {
+      await removePasskeyMutation({ id });
+      saveLocalBiometricState(false);
+      setPasskeyActionStatus('Passkey removed.');
+      setTimeout(() => setPasskeyActionStatus(''), 3000);
+    } catch (err: any) {
+      setPasskeyActionError(err.message || 'Failed to remove passkey');
+    }
+  };
+
+  const handlePasskeySignInOnLogin = async () => {
+    setAuthError('');
+    setIsSubmittingAuth(true);
+    try {
+      const local = getLocalBiometricState();
+      const res = await authenticateWithBiometrics(local.credentialId || undefined);
+      if (res && res.success) {
+        setIsAppShieldLocked(false);
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Passkey verification failed. Please sign in with password or email code.');
+    } finally {
+      setIsSubmittingAuth(false);
     }
   };
 
@@ -1191,6 +1310,20 @@ export default function App() {
                 </button>
               </div>
 
+              {!isRegisterMode && isDeviceBiometricAvailable && (
+                <div className="mb-3 text-center">
+                  <button
+                    type="button"
+                    onClick={handlePasskeySignInOnLogin}
+                    disabled={isSubmittingAuth}
+                    className="w-full py-3 px-4 bg-money-500/10 hover:bg-money-500/20 border border-money-500/30 rounded-xl text-money-400 font-medium text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Icons.Fingerprint />
+                    <span>Unlock / Sign in with Device Passkey</span>
+                  </button>
+                </div>
+              )}
+
               {!isRegisterMode && (
                 <div className="mb-4 text-center">
                   <button
@@ -1220,6 +1353,77 @@ export default function App() {
               </div>
             </>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Biometric App Shield Lock Screen ---
+  if (isAppShieldLocked && (settings.isBiometricLockEnabled || getLocalBiometricState().enabled)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-shark-950 text-white font-sans px-4 relative overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="absolute w-96 h-96 bg-money-500/10 rounded-full blur-3xl pointer-events-none -top-20 -left-20"></div>
+        <div className="absolute w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -bottom-20 -right-20"></div>
+
+        <div className="w-full max-w-md p-8 bg-shark-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-money-500/20 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200 z-10">
+          {/* Glowing Shield Icon */}
+          <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-3xl bg-money-500/20 animate-ping opacity-25"></div>
+            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-money-500/20 to-emerald-600/30 border border-money-500/40 flex items-center justify-center text-money-400 shadow-xl shadow-money-500/10">
+              <Icons.Fingerprint />
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-white mb-2">
+              Money Shark Vault Locked
+            </h2>
+            <p className="text-sm text-shark-300">
+              Biometric verification required to access your financial records.
+            </p>
+          </div>
+
+          {biometricAuthError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs text-center font-medium">
+              {biometricAuthError}
+            </div>
+          )}
+
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={handleUnlockWithBiometrics}
+              disabled={isVerifyingBiometric}
+              className="w-full py-4 bg-gradient-to-r from-money-600 to-emerald-600 hover:from-money-500 hover:to-emerald-500 active:scale-[0.98] text-white rounded-2xl font-bold text-lg shadow-xl shadow-money-900/40 transition-all flex items-center justify-center gap-3 cursor-pointer"
+            >
+              {isVerifyingBiometric ? (
+                <>
+                  <span className="animate-spin"><Icons.Refresh /></span>
+                  <span>Verifying Device...</span>
+                </>
+              ) : (
+                <>
+                  <Icons.Fingerprint />
+                  <span>Unlock with Biometrics</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                signOut().catch(() => {});
+                setIsAppShieldLocked(false);
+              }}
+              className="w-full py-3 bg-shark-800/80 hover:bg-shark-700 text-shark-300 hover:text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Icons.LogOut /> Switch Account / Sign Out
+            </button>
+          </div>
+
+          <div className="text-[11px] text-shark-500 flex items-center justify-center gap-1.5 pt-2">
+            <Icons.Shield />
+            <span>Hardware-Backed WebAuthn Biometric Shield</span>
+          </div>
         </div>
       </div>
     );
@@ -1974,6 +2178,100 @@ export default function App() {
                   >
                     <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.globalCompoundMonthly ? 'translate-x-6' : 'translate-x-0'}`}></div>
                   </button>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
+
+                {/* BIOMETRIC & PASSKEY SECURITY CARD */}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-money-500"><Icons.Fingerprint /></span>
+                        <h3 className="font-bold text-slate-900 dark:text-white">Biometric Passkey & App Shield</h3>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
+                        Lock the application with hardware-backed Face ID, Touch ID, or Windows Hello.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTempSettings({ ...tempSettings, isBiometricLockEnabled: !tempSettings.isBiometricLockEnabled })}
+                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${tempSettings.isBiometricLockEnabled ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.isBiometricLockEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                  </div>
+
+                  {/* Device Biometrics Status */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isDeviceBiometricAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {isDeviceBiometricAvailable ? 'Biometrics Available (Face ID / Touch ID / Windows Hello)' : 'Biometrics Not Detected (Using fallback)'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRegisterDevicePasskey}
+                      disabled={isRegisteringPasskey}
+                      className="px-3.5 py-2 rounded-lg bg-money-600 hover:bg-money-500 disabled:opacity-50 text-white font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                    >
+                      {isRegisteringPasskey ? (
+                        <span className="animate-spin"><Icons.Refresh /></span>
+                      ) : (
+                        <Icons.Key />
+                      )}
+                      <span>Register Device Passkey</span>
+                    </button>
+                  </div>
+
+                  {passkeyActionStatus && (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
+                      {passkeyActionStatus}
+                    </div>
+                  )}
+
+                  {passkeyActionError && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                      {passkeyActionError}
+                    </div>
+                  )}
+
+                  {/* Registered Passkeys List */}
+                  {passkeysList && passkeysList.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-shark-400">
+                        Registered Device Passkeys ({passkeysList.length})
+                      </span>
+                      <div className="space-y-1.5">
+                        {passkeysList.map((p: any) => (
+                          <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-shark-900/60 border border-slate-200 dark:border-shark-700/60 text-xs">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-money-500"><Icons.Shield /></span>
+                              <div>
+                                <p className="font-semibold text-slate-800 dark:text-white">{p.deviceName}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-shark-400">
+                                  Enrolled on {new Date(p.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePasskey(p.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                              title="Remove Passkey"
+                            >
+                              <Icons.Trash />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>

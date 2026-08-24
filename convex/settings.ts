@@ -7,6 +7,7 @@ export const save = mutation({
     globalInitialInterestRate: v.number(),
     globalInterestRate: v.number(),
     globalCompoundMonthly: v.boolean(),
+    isBiometricLockEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -19,12 +20,16 @@ export const save = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
 
-    const data = {
+    const data: any = {
       userId,
       globalInitialInterestRate: args.globalInitialInterestRate,
       globalInterestRate: args.globalInterestRate,
       globalCompoundMonthly: args.globalCompoundMonthly,
     };
+
+    if (args.isBiometricLockEnabled !== undefined) {
+      data.isBiometricLockEnabled = args.isBiometricLockEnabled;
+    }
 
     if (existing) {
       await ctx.db.patch(existing._id, data);
@@ -36,6 +41,7 @@ export const save = mutation({
       globalInitialInterestRate: args.globalInitialInterestRate,
       globalInterestRate: args.globalInterestRate,
       globalCompoundMonthly: args.globalCompoundMonthly,
+      isBiometricLockEnabled: args.isBiometricLockEnabled ?? existing?.isBiometricLockEnabled ?? false,
     };
   },
 });

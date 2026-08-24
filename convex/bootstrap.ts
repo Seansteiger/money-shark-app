@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS = {
   globalInitialInterestRate: 50,
   globalInterestRate: 30,
   globalCompoundMonthly: true,
+  isBiometricLockEnabled: false,
 };
 
 export const get = query({
@@ -31,7 +32,7 @@ export const get = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
 
-    // Sort loans by creation time descending (simulate orderBy desc in Prisma)
+    // Sort loans by creation time descending
     const sortedLoans = [...loansDocs].sort((a, b) => b._creationTime - a._creationTime);
     // Sort customers by creation time descending
     const sortedCustomers = [...customersDocs].sort((a, b) => b._creationTime - a._creationTime);
@@ -42,6 +43,7 @@ export const get = query({
             globalInitialInterestRate: settingsDoc.globalInitialInterestRate,
             globalInterestRate: settingsDoc.globalInterestRate,
             globalCompoundMonthly: settingsDoc.globalCompoundMonthly,
+            isBiometricLockEnabled: settingsDoc.isBiometricLockEnabled ?? false,
           }
         : DEFAULT_SETTINGS,
       customers: sortedCustomers.map((c) => ({

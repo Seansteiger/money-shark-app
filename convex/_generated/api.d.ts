@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as bootstrap from "../bootstrap.js";
 import type * as http from "../http.js";
 import type * as loans from "../loans.js";
+import type * as passkeys from "../passkeys.js";
 import type * as reset from "../reset.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   bootstrap: typeof bootstrap;
   http: typeof http;
   loans: typeof loans;
+  passkeys: typeof passkeys;
   reset: typeof reset;
   seed: typeof seed;
   settings: typeof settings;
