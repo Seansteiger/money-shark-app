@@ -361,6 +361,92 @@ export default function App() {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  const formatAuthError = (error: any, flow: 'signIn' | 'signUp' | 'otp-verify' | 'reset' | 'reset-verify' | 'oauth'): string => {
+    const raw = (error?.message || (typeof error === 'string' ? error : '')).toString();
+    const lower = raw.toLowerCase();
+
+    // 1. Sign-in error (unregistered user, wrong email, wrong password, or Convex Server Error)
+    if (flow === 'signIn') {
+      if (
+        lower.includes('invalid credentials') ||
+        lower.includes('server error') ||
+        lower.includes('called by client') ||
+        lower.includes('could not find') ||
+        lower.includes('not found') ||
+        lower.includes('auth:signin') ||
+        lower.includes('unauthorized') ||
+        lower.includes('password') ||
+        lower.includes('account') ||
+        lower.includes('user')
+      ) {
+        return 'Account not found or password incorrect. If you are a new user, please click "Create one" below.';
+      }
+      return 'Invalid email or password. Please verify your credentials or create an account.';
+    }
+
+    // 2. Sign-up registration error (user already exists)
+    if (flow === 'signUp') {
+      if (
+        lower.includes('already exists') ||
+        lower.includes('duplicate') ||
+        lower.includes('server error') ||
+        lower.includes('account already')
+      ) {
+        return 'An account with this email already exists. Please sign in instead.';
+      }
+      if (lower.includes('invalid password') || lower.includes('short') || lower.includes('length')) {
+        return 'Password must be at least 8 characters long.';
+      }
+      return 'Could not complete registration. Please check your email and password requirements.';
+    }
+
+    // 3. 6-digit OTP verification error
+    if (flow === 'otp-verify') {
+      if (
+        lower.includes('invalid code') ||
+        lower.includes('could not verify') ||
+        lower.includes('server error') ||
+        lower.includes('expired') ||
+        lower.includes('called by client')
+      ) {
+        return 'Invalid or expired 6-digit code. Please verify the code in your email or click Resend.';
+      }
+      return 'Verification code is invalid. Please try again or request a new code.';
+    }
+
+    // 4. Password recovery reset errors
+    if (flow === 'reset') {
+      if (lower.includes('not found') || lower.includes('server error') || lower.includes('invalid') || lower.includes('called by client')) {
+        return 'No account found with this email. Please check the spelling or register a new account.';
+      }
+      return 'Unable to send reset code. Please check your email address.';
+    }
+
+    if (flow === 'reset-verify') {
+      if (lower.includes('invalid code') || lower.includes('server error') || lower.includes('called by client')) {
+        return 'Invalid reset code. Please check your email or request a new code.';
+      }
+      return 'Could not reset password. Please try requesting a new reset code.';
+    }
+
+    // 5. OAuth
+    if (flow === 'oauth') {
+      return 'Sign in with provider failed or was canceled. Please try again.';
+    }
+
+    // 6. Network & Rate Limiting
+    if (lower.includes('rate limit') || lower.includes('too many')) {
+      return 'Too many attempts. Please wait a moment before trying again.';
+    }
+    if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('offline')) {
+      return 'Network connection issue. Please check your internet connection and retry.';
+    }
+
+    return raw && !raw.includes('CONVEX') && !raw.includes('Server Error')
+      ? raw
+      : 'Authentication request failed. Please check your credentials and try again.';
+  };
+
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setAuthError('');
@@ -426,8 +512,14 @@ export default function App() {
         }
       }
     } catch (error: any) {
-      const msg = error instanceof Error ? error.message : 'Authentication failed';
-      setAuthError(msg);
+      const flow = authStep === 'otp-verify'
+        ? 'otp-verify'
+        : authStep === 'reset-verify'
+        ? 'reset-verify'
+        : isRegisterMode
+        ? 'signUp'
+        : 'signIn';
+      setAuthError(formatAuthError(error, flow));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -449,7 +541,7 @@ export default function App() {
       setAuthStep('otp-verify');
       setResendStatus(`Verification email sent to ${authEmail}`);
     } catch (err: any) {
-      setAuthError(err instanceof Error ? err.message : 'Failed to send verification email');
+      setAuthError(formatAuthError(err, 'signIn'));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -474,7 +566,7 @@ export default function App() {
       }
       setResendStatus(`A fresh verification email was sent to ${authEmail}`);
     } catch (err: any) {
-      setAuthError(err instanceof Error ? err.message : 'Failed to resend verification email');
+      setAuthError(formatAuthError(err, isRegisterMode ? 'signUp' : 'signIn'));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -497,7 +589,7 @@ export default function App() {
       setAuthStep('reset-verify');
       setResendStatus(`Password reset code sent to ${authEmail}`);
     } catch (err: any) {
-      setAuthError(err instanceof Error ? err.message : 'Failed to send reset code');
+      setAuthError(formatAuthError(err, 'reset'));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -509,7 +601,7 @@ export default function App() {
     try {
       await signIn(provider);
     } catch (err: any) {
-      setAuthError(err instanceof Error ? err.message : `${provider} sign in failed`);
+      setAuthError(formatAuthError(err, 'oauth'));
       setIsSubmittingAuth(false);
     }
   };
@@ -1008,7 +1100,7 @@ export default function App() {
               )}
 
               {authError && (
-                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                <div className="text-red-400 text-xs sm:text-sm text-center bg-red-950/40 p-3.5 rounded-xl border border-red-500/30 leading-relaxed font-medium">
                   {authError}
                 </div>
               )}
@@ -1093,7 +1185,7 @@ export default function App() {
               )}
 
               {authError && (
-                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                <div className="text-red-400 text-xs sm:text-sm text-center bg-red-950/40 p-3.5 rounded-xl border border-red-500/30 leading-relaxed font-medium">
                   {authError}
                 </div>
               )}
@@ -1147,7 +1239,7 @@ export default function App() {
               </div>
 
               {authError && (
-                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                <div className="text-red-400 text-xs sm:text-sm text-center bg-red-950/40 p-3.5 rounded-xl border border-red-500/30 leading-relaxed font-medium">
                   {authError}
                 </div>
               )}
@@ -1201,7 +1293,7 @@ export default function App() {
               </div>
 
               {authError && (
-                <div className="text-red-400 text-xs text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                <div className="text-red-400 text-xs sm:text-sm text-center bg-red-950/40 p-3.5 rounded-xl border border-red-500/30 leading-relaxed font-medium">
                   {authError}
                 </div>
               )}
@@ -1298,7 +1390,7 @@ export default function App() {
                 </div>
 
                 {authError && (
-                  <div className="text-red-400 text-sm text-center bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                  <div className="text-red-400 text-xs sm:text-sm text-center bg-red-950/40 p-3.5 rounded-xl border border-red-500/30 leading-relaxed font-medium">
                     {authError}
                   </div>
                 )}
