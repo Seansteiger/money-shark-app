@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loan, Customer, Repayment, PaymentMethod } from '../types';
+import { Loan, Customer, Repayment } from '../types';
 import { LoanCalculations, formatCurrency, formatDate } from '../utils/calculations';
 
 interface PaymentModalProps {
@@ -13,7 +13,6 @@ interface PaymentModalProps {
     loanId: string;
     amount: number;
     paymentDate: string;
-    paymentMethod: PaymentMethod;
     notes: string;
   }) => Promise<void>;
   onDeletePayment: (paymentId: string) => Promise<void>;
@@ -35,7 +34,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -66,44 +64,30 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         loanId: loan.id,
         amount: numAmount,
         paymentDate,
-        paymentMethod,
         notes: notes.trim(),
       });
       setAmount('');
       setNotes('');
-      // Switch to history to view newly logged payment
+      // Switch to history to view newly logged transaction
       setActiveTab('history');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to record payment');
+      setErrorMessage(err.message || 'Failed to record transaction');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (paymentId: string) => {
-    if (!confirm('Are you sure you want to remove this payment entry? The loan balance will be restored.')) {
+    if (!confirm('Are you sure you want to remove this transaction entry? The loan balance will be restored.')) {
       return;
     }
     setDeletingId(paymentId);
     try {
       await onDeletePayment(paymentId);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete payment');
+      alert(err.message || 'Failed to delete transaction');
     } finally {
       setDeletingId(null);
-    }
-  };
-
-  const getMethodBadge = (method: PaymentMethod) => {
-    switch (method) {
-      case 'CASH':
-        return { label: '💵 Cash', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
-      case 'BANK_TRANSFER':
-        return { label: '🏦 Bank Transfer (EFT)', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' };
-      case 'CARD':
-        return { label: '💳 Card Payment', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' };
-      default:
-        return { label: '⚡ Other', color: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' };
     }
   };
 
@@ -118,7 +102,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Loan Installment Ledger
+                Log Loan Installment
               </h3>
               <p className="text-xs text-slate-500 dark:text-shark-400">
                 Borrower: <strong className="text-slate-700 dark:text-shark-200">{customer?.name || 'Customer'}</strong>
@@ -128,7 +112,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-200/50 dark:hover:bg-shark-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-200/50 dark:hover:bg-shark-800 transition-colors cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -177,24 +161,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('record')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
               activeTab === 'record'
                 ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
                 : 'border-transparent text-slate-500 dark:text-shark-400 hover:text-slate-800 dark:hover:text-white'
             }`}
           >
-            + Record New Payment
+            + Log Transaction
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'history'
                 ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
                 : 'border-transparent text-slate-500 dark:text-shark-400 hover:text-slate-800 dark:hover:text-white'
             }`}
           >
-            <span>Payment History</span>
+            <span>Transaction History</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-shark-800 text-slate-700 dark:text-shark-300">
               {loanRepayments.length}
             </span>
@@ -214,7 +198,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               {/* Payment Amount */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-shark-400 uppercase mb-1.5">
-                  Payment Amount (ZAR) *
+                  Amount Received (ZAR) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 dark:text-shark-500">
@@ -238,7 +222,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleQuickAmount(remaining)}
-                      className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all active:scale-95"
+                      className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all active:scale-95 cursor-pointer"
                     >
                       Pay Full Remaining ({formatCurrency(remaining)})
                     </button>
@@ -246,7 +230,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleQuickAmount(Math.round(remaining / 2))}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 dark:bg-shark-800 hover:bg-slate-200 dark:hover:bg-shark-700 text-slate-600 dark:text-shark-300 border border-slate-200 dark:border-shark-700 transition-all active:scale-95"
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 dark:bg-shark-800 hover:bg-slate-200 dark:hover:bg-shark-700 text-slate-600 dark:text-shark-300 border border-slate-200 dark:border-shark-700 transition-all active:scale-95 cursor-pointer"
                       >
                         Pay Half ({formatCurrency(Math.round(remaining / 2))})
                       </button>
@@ -255,48 +239,30 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 )}
               </div>
 
-              {/* Payment Date & Method */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-shark-400 uppercase mb-1.5">
-                    Date Received *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-shark-400 uppercase mb-1.5">
-                    Payment Channel *
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition-colors"
-                  >
-                    <option value="CASH">💵 Cash</option>
-                    <option value="BANK_TRANSFER">🏦 Bank Transfer (EFT)</option>
-                    <option value="CARD">💳 Card Payment</option>
-                    <option value="OTHER">⚡ Other</option>
-                  </select>
-                </div>
+              {/* Transaction Date */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-shark-400 uppercase mb-1.5">
+                  Transaction Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition-colors"
+                />
               </div>
 
               {/* Notes / Reference */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-shark-400 uppercase mb-1.5">
-                  Payment Reference / Notes
+                  Notes / Transaction Reference
                 </label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Handed cash in person / FNB payment confirmation"
+                  placeholder="e.g. Cash received, bank deposit ref, or customer note"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition-colors"
                 />
               </div>
@@ -306,20 +272,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-5 py-2.5 text-xs font-bold text-slate-600 dark:text-shark-300 hover:bg-slate-100 dark:hover:bg-shark-800 rounded-xl transition-colors"
+                  className="px-5 py-2.5 text-xs font-bold text-slate-600 dark:text-shark-300 hover:bg-slate-100 dark:hover:bg-shark-800 rounded-xl transition-colors cursor-pointer"
                 >
                   Close
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
-                    <span>Recording...</span>
+                    <span>Logging...</span>
                   ) : (
                     <>
-                      <span>Save Installment</span>
+                      <span>Save Transaction</span>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
@@ -334,15 +300,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               {loanRepayments.length === 0 ? (
                 <div className="text-center py-10 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-shark-800">
                   <div className="text-3xl mb-2">📋</div>
-                  <p className="text-sm font-semibold text-slate-700 dark:text-shark-300">No installments recorded yet</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-shark-300">No installments logged yet</p>
                   <p className="text-xs text-slate-500 dark:text-shark-500 mt-1">
-                    Use the "Record New Payment" tab to log cash or bank transfers.
+                    Use the "+ Log Transaction" tab to record customer payments.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2.5">
                   {loanRepayments.map((item) => {
-                    const badge = getMethodBadge(item.paymentMethod);
                     return (
                       <div
                         key={item.id}
@@ -353,16 +318,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             ✓
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
                               <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">
                                 +{formatCurrency(item.amount)}
                               </span>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badge.color}`}>
-                                {badge.label}
-                              </span>
                             </div>
                             <div className="text-[11px] text-slate-500 dark:text-shark-400 mt-0.5 truncate">
-                              Paid on {formatDate(item.paymentDate)}
+                              Logged on {formatDate(item.paymentDate)}
                               {item.notes && <span> • "{item.notes}"</span>}
                             </div>
                           </div>
@@ -372,8 +334,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           type="button"
                           onClick={() => handleDelete(item.id)}
                           disabled={deletingId === item.id}
-                          className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
-                          title="Undo payment"
+                          className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors shrink-0 cursor-pointer"
+                          title="Undo transaction entry"
                         >
                           {deletingId === item.id ? (
                             <span className="text-xs">...</span>

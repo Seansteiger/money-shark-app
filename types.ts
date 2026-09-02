@@ -12,15 +12,13 @@ export enum InterestType {
   COMPOUND = 'COMPOUND',
 }
 
-export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'OTHER';
-
 export interface Repayment {
   id: string;
   loanId: string;
   customerId: string;
   amount: number;
   paymentDate: string; // ISO date YYYY-MM-DD
-  paymentMethod: PaymentMethod;
+  paymentMethod?: string;
   notes?: string;
   createdAt?: number;
 }

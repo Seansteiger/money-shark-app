@@ -46,7 +46,7 @@ export default defineSchema({
     customerId: v.id("customers"),
     amount: v.number(),
     paymentDate: v.string(), // ISO Date YYYY-MM-DD
-    paymentMethod: v.union(v.literal("CASH"), v.literal("BANK_TRANSFER"), v.literal("CARD"), v.literal("OTHER")),
+    paymentMethod: v.optional(v.string()),
     notes: v.optional(v.string()),
     isDeleted: v.optional(v.boolean()),
     deletedAt: v.optional(v.number()),

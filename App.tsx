@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { useQuery, useMutation } from 'convex/react';
 import { api } from './convex/_generated/api';
 
-import { Customer, Loan, InterestType, AppSettings, UserPasskey, Repayment, PaymentMethod } from './types';
+import { Customer, Loan, InterestType, AppSettings, UserPasskey, Repayment } from './types';
 import {
   isBiometricSupported,
   registerDevicePasskey,
@@ -1180,7 +1180,6 @@ export default function App() {
     loanId: string;
     amount: number;
     paymentDate: string;
-    paymentMethod: PaymentMethod;
     notes: string;
   }) => {
     try {
@@ -1188,7 +1187,6 @@ export default function App() {
         loanId: data.loanId,
         amount: data.amount,
         paymentDate: data.paymentDate,
-        paymentMethod: data.paymentMethod,
         notes: data.notes,
       });
 
@@ -1198,7 +1196,6 @@ export default function App() {
         customerId: res.customerId || '',
         amount: data.amount,
         paymentDate: data.paymentDate,
-        paymentMethod: data.paymentMethod,
         notes: data.notes,
         createdAt: Date.now(),
       };

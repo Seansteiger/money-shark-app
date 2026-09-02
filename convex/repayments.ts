@@ -34,7 +34,7 @@ export const recordPayment = mutation({
     loanId: v.id("loans"),
     amount: v.number(),
     paymentDate: v.string(),
-    paymentMethod: v.union(v.literal("CASH"), v.literal("BANK_TRANSFER"), v.literal("CARD"), v.literal("OTHER")),
+    paymentMethod: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -59,7 +59,7 @@ export const recordPayment = mutation({
       customerId: loan.customerId,
       amount: args.amount,
       paymentDate: args.paymentDate || new Date().toISOString().split("T")[0],
-      paymentMethod: args.paymentMethod,
+      paymentMethod: args.paymentMethod || undefined,
       notes: args.notes || "",
     });
 

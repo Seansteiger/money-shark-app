@@ -1,6 +1,6 @@
 import { api } from '../convex/_generated/api';
 import { convex } from './convexClient';
-import { AppSettings, Customer, Loan, PaymentMethod, Repayment } from '../types';
+import { AppSettings, Customer, Loan, Repayment } from '../types';
 
 export const getBootstrap = async () => {
   return convex.query(api.bootstrap.get);
@@ -53,7 +53,7 @@ export const recordPayment = async (payload: {
   loanId: string;
   amount: number;
   paymentDate: string;
-  paymentMethod: PaymentMethod;
+  paymentMethod?: string;
   notes?: string;
 }) => {
   return (await convex.mutation(api.repayments.recordPayment, {
