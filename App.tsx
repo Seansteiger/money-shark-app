@@ -67,7 +67,126 @@ const Icons = {
   Fingerprint: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>,
   Shield: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>,
   Key: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21 2-2 2m-1.5 1.5L14 9l-1.5-1.5L11 9l-1.5-1.5L8 9c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5c0-.64-.13-1.25-.35-1.81L21 4V2z"/><circle cx="7.5" cy="14.5" r="1.5"/></svg>,
+  MapPin: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+  User: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  UserPlus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>,
+  Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
+  Phone: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  Image: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>,
 };
+
+// Helper: Extract uppercase initials from customer name
+function getCustomerInitials(name: string): string {
+  if (!name) return '??';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Helper: Deterministic gradient for avatar fallback
+function getAvatarGradient(name: string): string {
+  const gradients = [
+    'from-emerald-500 to-teal-700',
+    'from-blue-500 to-indigo-700',
+    'from-purple-500 to-pink-700',
+    'from-amber-500 to-orange-700',
+    'from-cyan-500 to-blue-700',
+    'from-rose-500 to-red-700',
+  ];
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+}
+
+// Fast on-device client image compression to keep database and local cache ultra-fast
+function compressImage(fileOrDataUrl: File | string, maxWidth = 360, maxHeight = 360, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement('img');
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas context not available'));
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = (e) => reject(e);
+
+    if (typeof fileOrDataUrl === 'string') {
+      img.src = fileOrDataUrl;
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(fileOrDataUrl);
+    }
+  });
+}
+
+// Customer Profile Avatar Component
+interface CustomerAvatarProps {
+  customer?: { name?: string; avatar?: string; address?: string };
+  name?: string;
+  avatar?: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  className?: string;
+  onClick?: () => void;
+}
+
+function CustomerAvatar({ customer, name, avatar, size = 'md', className = '', onClick }: CustomerAvatarProps) {
+  const sizeClasses = {
+    xs: 'w-6 h-6 text-[10px]',
+    sm: 'w-8 h-8 text-xs',
+    md: 'w-10 h-10 text-sm',
+    lg: 'w-12 h-12 text-base',
+    xl: 'w-16 h-16 text-xl',
+    '2xl': 'w-24 h-24 text-3xl',
+  }[size];
+
+  const displayName = name || customer?.name || 'Customer';
+  const displayAvatar = avatar !== undefined ? avatar : customer?.avatar;
+  const initials = getCustomerInitials(displayName);
+  const gradient = getAvatarGradient(displayName);
+
+  if (displayAvatar && displayAvatar.trim() !== '') {
+    return (
+      <img
+        src={displayAvatar}
+        alt={displayName}
+        onClick={onClick}
+        className={`${sizeClasses} rounded-full object-cover border-2 border-money-500/40 shadow-sm shrink-0 ${onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''} ${className}`}
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      className={`${sizeClasses} rounded-full bg-gradient-to-br ${gradient} text-white font-bold flex items-center justify-center shadow-sm shrink-0 select-none border border-white/20 ${onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''} ${className}`}
+    >
+      {initials}
+    </div>
+  );
+}
 
 const DEFAULT_SETTINGS: AppSettings = {
   globalInitialInterestRate: 50,
@@ -140,6 +259,30 @@ export default function App() {
   const passkeysList = useQuery(api.passkeys.list, isAuthenticated ? undefined : "skip");
   const savePasskeyMutation = useMutation(api.passkeys.savePasskey);
   const removePasskeyMutation = useMutation(api.passkeys.removePasskey);
+
+  // Customer Management Mutations
+  const saveCustomerMutation = useMutation(api.customers.saveCustomer);
+  const deleteCustomerMutation = useMutation(api.customers.deleteCustomer);
+
+  // Customer Management Modal State
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<{
+    id?: string;
+    name: string;
+    address: string;
+    avatar: string;
+    phone: string;
+    notes: string;
+  }>({
+    name: '',
+    address: '',
+    avatar: '',
+    phone: '',
+    notes: '',
+  });
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [customerModalError, setCustomerModalError] = useState('');
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const [isDeviceBiometricAvailable, setIsDeviceBiometricAvailable] = useState(false);
   const [isAppShieldLocked, setIsAppShieldLocked] = useState(() => {
@@ -251,6 +394,9 @@ export default function App() {
   // Unified Form State
   const [formData, setFormData] = useState({
     customerName: '',
+    customerAddress: '',
+    customerAvatar: '',
+    customerPhone: '',
     principal: '' as any,
     initialInterestRate: DEFAULT_SETTINGS.globalInitialInterestRate as any,
     interestRate: DEFAULT_SETTINGS.globalInterestRate as any,
@@ -261,6 +407,8 @@ export default function App() {
   });
 
   // Scanner & Live Camera State
+  // Camera Purpose: 'ocr_scan' (invokes Gemini AI) vs 'customer_avatar_form' | 'customer_avatar_modal' (Zero AI)
+  const [cameraPurpose, setCameraPurpose] = useState<'ocr_scan' | 'customer_avatar_form' | 'customer_avatar_modal'>('ocr_scan');
   const [scannedImage, setScannedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scanClarification, setScanClarification] = useState<string | null>(null);
@@ -269,12 +417,14 @@ export default function App() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const formAvatarFileInputRef = useRef<HTMLInputElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // 3. Debounced Draft Auto-Save to IndexedDB
   useEffect(() => {
     if (!isDeviceHydrated) return;
-    if (formData.customerName || formData.principal || formData.notes || scannedImage) {
+    if (formData.customerName || formData.principal || formData.notes || scannedImage || formData.customerAddress) {
       const timer = setTimeout(() => {
         saveDraftEntry({ formData, scannedImage, scanClarification }).catch(() => {});
       }, 400);
@@ -616,8 +766,6 @@ export default function App() {
     await clearAllDeviceStorage();
   };
 
-  const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || 'Unknown';
-
   const handleResetRequest = () => {
     setShowResetConfirm(true);
     setResetPinInput('');
@@ -746,6 +894,133 @@ export default function App() {
     }
   };
 
+  // --- Customer & Loan Helpers ---
+  const getCustomer = (id: string): Customer | undefined => customers.find(c => c.id === id);
+  const getCustomerName = (id: string) => getCustomer(id)?.name || 'Unknown';
+
+  const handleCustomerNameChange = (name: string) => {
+    const existing = customers.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+    if (existing) {
+      setFormData((prev) => ({
+        ...prev,
+        customerName: name,
+        customerAddress: existing.address || prev.customerAddress,
+        customerAvatar: existing.avatar || prev.customerAvatar,
+        customerPhone: existing.phone || prev.customerPhone,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        customerName: name,
+      }));
+    }
+  };
+
+  // --- Customer Modal Management Handlers ---
+  const handleOpenNewCustomerModal = () => {
+    setEditingCustomer({
+      name: '',
+      address: '',
+      avatar: '',
+      phone: '',
+      notes: '',
+    });
+    setCustomerModalError('');
+    setShowCustomerModal(true);
+  };
+
+  const handleOpenEditCustomerModal = (c: Customer) => {
+    setEditingCustomer({
+      id: c.id,
+      name: c.name,
+      address: c.address || '',
+      avatar: c.avatar || '',
+      phone: c.phone || '',
+      notes: c.notes || '',
+    });
+    setCustomerModalError('');
+    setShowCustomerModal(true);
+  };
+
+  const handleSaveCustomerModal = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!editingCustomer.name.trim()) {
+      setCustomerModalError('Please enter a customer name.');
+      return;
+    }
+
+    setIsSavingCustomer(true);
+    setCustomerModalError('');
+    try {
+      const saved = await saveCustomerMutation({
+        id: editingCustomer.id as any,
+        name: editingCustomer.name.trim(),
+        address: editingCustomer.address.trim(),
+        avatar: editingCustomer.avatar,
+        phone: editingCustomer.phone.trim(),
+        notes: editingCustomer.notes.trim(),
+      });
+
+      setCustomers((prev) => {
+        const idx = prev.findIndex((c) => c.id === saved.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = saved as any;
+          return copy;
+        }
+        return [saved as any, ...prev];
+      });
+
+      setShowCustomerModal(false);
+    } catch (err: any) {
+      console.error('Failed to save customer:', err);
+      setCustomerModalError(err.message || 'Could not save customer profile.');
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string, name: string) => {
+    const count = loans.filter((l) => l.customerId === id).length;
+    const confirmMsg = count > 0
+      ? `Are you sure you want to delete ${name}? This will also delete ${count} associated loan record(s).`
+      : `Are you sure you want to delete ${name}?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await deleteCustomerMutation({ id: id as any });
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      setLoans((prev) => prev.filter((l) => l.customerId !== id));
+    } catch (err) {
+      console.error('Failed to delete customer:', err);
+      alert('Could not delete customer.');
+    }
+  };
+
+  // Avatar file selection from device gallery (strictly zero AI usage)
+  const handleFormAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, 320, 320, 0.85);
+      setFormData((prev) => ({ ...prev, customerAvatar: compressed }));
+    } catch (err) {
+      console.warn('Avatar compression failed:', err);
+    }
+  };
+
+  const handleModalAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, 320, 320, 0.85);
+      setEditingCustomer((prev) => ({ ...prev, avatar: compressed }));
+    } catch (err) {
+      console.warn('Avatar compression failed:', err);
+    }
+  };
+
   // --- Calculations ---
   const activeLoans = loans.filter(l => l.status === 'ACTIVE');
   const totalPrincipal = activeLoans.reduce((sum, l) => sum + l.principal, 0);
@@ -761,15 +1036,29 @@ export default function App() {
   const filteredActiveLoans = activeLoans.filter(loan => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-    const customerName = getCustomerName(loan.customerId).toLowerCase();
+    const customer = getCustomer(loan.customerId);
+    const customerName = (customer?.name || '').toLowerCase();
+    const customerAddress = (customer?.address || '').toLowerCase();
     const dateRaw = loan.startDate;
     const dateFormatted = formatDate(loan.startDate).toLowerCase();
-    return customerName.includes(term) || dateRaw.includes(term) || dateFormatted.includes(term);
+    return customerName.includes(term) || customerAddress.includes(term) || dateRaw.includes(term) || dateFormatted.includes(term);
+  });
+
+  // Filter Customers for Directory View
+  const filteredCustomers = customers.filter(c => {
+    if (!customerSearchTerm) return true;
+    const term = customerSearchTerm.toLowerCase();
+    return c.name.toLowerCase().includes(term) || (c.address || '').toLowerCase().includes(term) || (c.phone || '').toLowerCase().includes(term);
   });
 
   // --- Live Camera & AI Image Handling ---
-  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+  const startCamera = async (
+    facing: 'environment' | 'user' = cameraFacing,
+    purpose: 'ocr_scan' | 'customer_avatar_form' | 'customer_avatar_modal' = 'ocr_scan'
+  ) => {
     stopCamera();
+    setCameraPurpose(purpose);
+    setCameraFacing(facing);
     setCameraError(null);
     setIsCameraActive(true);
     try {
@@ -814,10 +1103,10 @@ export default function App() {
   const toggleCameraFacing = () => {
     const next = cameraFacing === 'environment' ? 'user' : 'environment';
     setCameraFacing(next);
-    startCamera(next);
+    startCamera(next, cameraPurpose);
   };
 
-  const takePhotoSnap = () => {
+  const takePhotoSnap = async () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
@@ -826,10 +1115,32 @@ export default function App() {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64DataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      setScannedImage(base64DataUrl);
-      stopCamera();
-      analyzeImage(base64DataUrl.split(',')[1], 'image/jpeg');
+      const rawDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+      if (cameraPurpose === 'ocr_scan') {
+        // Document OCR scan: calls Gemini AI
+        setScannedImage(rawDataUrl);
+        stopCamera();
+        analyzeImage(rawDataUrl.split(',')[1], 'image/jpeg');
+      } else if (cameraPurpose === 'customer_avatar_form') {
+        // Profile picture for loan entry form: ZERO AI usage
+        try {
+          const compressed = await compressImage(rawDataUrl, 320, 320, 0.85);
+          setFormData((prev) => ({ ...prev, customerAvatar: compressed }));
+        } catch (e) {
+          setFormData((prev) => ({ ...prev, customerAvatar: rawDataUrl }));
+        }
+        stopCamera();
+      } else if (cameraPurpose === 'customer_avatar_modal') {
+        // Profile picture for customer management modal: ZERO AI usage
+        try {
+          const compressed = await compressImage(rawDataUrl, 320, 320, 0.85);
+          setEditingCustomer((prev) => ({ ...prev, avatar: compressed }));
+        } catch (e) {
+          setEditingCustomer((prev) => ({ ...prev, avatar: rawDataUrl }));
+        }
+        stopCamera();
+      }
     }
   };
 
@@ -948,6 +1259,9 @@ export default function App() {
     try {
       const loanPayload = {
         customerName: formData.customerName,
+        customerAddress: formData.customerAddress,
+        customerAvatar: formData.customerAvatar,
+        customerPhone: formData.customerPhone,
         principal: parseFloat(formData.principal),
         initial_interest_rate: parseFloat(formData.initialInterestRate),
         interest_rate: parseFloat(formData.interestRate),
@@ -960,6 +1274,9 @@ export default function App() {
 
       const { customer, loan } = await createLoan({
         customerName: loanPayload.customerName,
+        customerAddress: loanPayload.customerAddress,
+        customerAvatar: loanPayload.customerAvatar,
+        customerPhone: loanPayload.customerPhone,
         principal: loanPayload.principal,
         initialInterestRate: loanPayload.initial_interest_rate,
         interestRate: loanPayload.interest_rate,
@@ -969,15 +1286,24 @@ export default function App() {
         notes: loanPayload.notes,
       });
 
-      if (!customers.some(c => c.id === customer.id)) {
-        setCustomers(prev => [customer, ...prev]);
-      }
+      setCustomers(prev => {
+        const idx = prev.findIndex(c => c.id === customer.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = customer;
+          return copy;
+        }
+        return [customer, ...prev];
+      });
 
       setLoans(prev => [loan, ...prev]);
 
       // Reset Form
       setFormData({
         customerName: '',
+        customerAddress: '',
+        customerAvatar: '',
+        customerPhone: '',
         principal: '',
         initialInterestRate: settings.globalInitialInterestRate,
         interestRate: settings.globalInterestRate,
@@ -1718,6 +2044,266 @@ export default function App() {
         </div>
       )}
 
+      {/* HIDDEN FILE INPUTS FOR DIRECT AVATAR SELECTION (STRICTLY ZERO AI USAGE) */}
+      <input
+        type="file"
+        ref={avatarFileInputRef}
+        accept="image/*"
+        onChange={handleModalAvatarFileSelect}
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={formAvatarFileInputRef}
+        accept="image/*"
+        onChange={handleFormAvatarFileSelect}
+        className="hidden"
+      />
+
+      {/* CAMERA VIEWFINDER MODAL (FOR CUSTOMER AVATAR CAPTURE - ZERO AI USAGE) */}
+      {isCameraActive && (cameraPurpose === 'customer_avatar_form' || cameraPurpose === 'customer_avatar_modal') && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="relative w-full max-w-lg bg-shark-950 rounded-3xl overflow-hidden shadow-2xl border border-shark-800 flex flex-col items-center">
+            {/* Top Bar */}
+            <div className="w-full px-6 py-4 flex items-center justify-between border-b border-shark-800 bg-shark-900/60">
+              <div className="flex items-center gap-2 text-money-400 text-sm font-bold">
+                <Icons.Camera />
+                <span>Customer Profile Photo</span>
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-shark-400 bg-shark-800 px-2.5 py-1 rounded-full border border-shark-700">
+                ⚡ Direct Capture • Zero AI
+              </span>
+            </div>
+
+            {/* Viewfinder Video Stream */}
+            <div className="relative w-full aspect-[4/3] max-h-[440px] bg-black flex items-center justify-center overflow-hidden">
+              <video
+                ref={videoRef}
+                playsInline
+                autoPlay
+                muted
+                className="w-full h-full object-cover"
+              />
+
+              {/* Circular Portrait Face Framing Guideline */}
+              <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                <div className="w-52 h-52 md:w-60 md:h-60 rounded-full border-2 border-dashed border-money-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] flex items-center justify-center">
+                  <span className="text-[11px] font-medium text-white bg-black/75 px-3 py-1 rounded-full border border-white/10 backdrop-blur">
+                    Align face inside circle
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Controls Bar */}
+            <div className="w-full bg-shark-950 px-6 py-5 flex items-center justify-between border-t border-shark-800">
+              <button
+                type="button"
+                onClick={toggleCameraFacing}
+                className="p-3 bg-shark-800 hover:bg-shark-700 text-slate-200 rounded-full transition-colors flex items-center justify-center"
+                title="Flip Camera"
+              >
+                <Icons.SwitchCamera />
+              </button>
+
+              <button
+                type="button"
+                onClick={takePhotoSnap}
+                className="relative p-1 rounded-full bg-money-500/30 hover:bg-money-500/40 active:scale-95 transition-transform"
+                title="Capture Profile Photo"
+              >
+                <div className="w-16 h-16 rounded-full border-4 border-white bg-money-500 flex items-center justify-center shadow-lg shadow-money-500/50">
+                  <div className="w-6 h-6 rounded-full bg-white"></div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="p-3 bg-shark-800 hover:bg-shark-700 text-slate-200 rounded-full transition-colors flex items-center justify-center"
+                title="Cancel"
+              >
+                <Icons.X />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOMER PROFILE MODAL (CREATE / EDIT CUSTOMER) */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-shark-900/80 backdrop-blur-sm" onClick={() => !isSavingCustomer && setShowCustomerModal(false)}></div>
+          <div className="relative bg-white dark:bg-shark-800 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-shark-700 overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 dark:border-shark-700">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-money-500/10 text-money-600 dark:text-money-400 rounded-xl">
+                  {editingCustomer.id ? <Icons.User /> : <Icons.UserPlus />}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                    {editingCustomer.id ? 'Edit Customer Profile' : 'New Customer Profile'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-shark-400">
+                    {editingCustomer.id ? 'Update customer information and photo' : 'Add borrower details and portrait'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCustomerModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors rounded-lg"
+              >
+                <Icons.X />
+              </button>
+            </div>
+
+            {/* Profile Avatar Section */}
+            <div className="flex flex-col items-center justify-center mb-6 p-5 bg-slate-50 dark:bg-shark-900/60 rounded-2xl border border-slate-200 dark:border-shark-700">
+              <div className="relative mb-3">
+                <CustomerAvatar
+                  name={editingCustomer.name}
+                  avatar={editingCustomer.avatar}
+                  size="2xl"
+                  className="ring-4 ring-money-500/30"
+                />
+                {editingCustomer.avatar && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingCustomer(prev => ({ ...prev, avatar: '' }))}
+                    className="absolute -top-1 -right-1 p-1.5 bg-red-600 text-white rounded-full hover:bg-red-500 shadow-md transition-transform active:scale-95"
+                    title="Remove Photo"
+                  >
+                    <Icons.X />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => startCamera('user', 'customer_avatar_modal')}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-money-600 hover:bg-money-500 text-white text-xs font-semibold rounded-xl shadow-md transition-all active:scale-95"
+                >
+                  <Icons.Camera />
+                  <span>Take Photo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-200 dark:bg-shark-700 hover:bg-slate-300 dark:hover:bg-shark-600 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-all active:scale-95"
+                >
+                  <Icons.Upload />
+                  <span>Choose Image</span>
+                </button>
+              </div>
+              <span className="text-[10px] text-slate-400 dark:text-shark-500 mt-2">
+                ⚡ Direct upload • Zero AI token usage
+              </span>
+            </div>
+
+            {customerModalError && (
+              <div className="p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium">
+                {customerModalError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCustomerModal} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">
+                  Full Customer Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingCustomer.name}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                  placeholder="e.g. Tony Spilotro"
+                  className="w-full bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-xl p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">
+                  Residential / Physical Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-shark-500">
+                    <Icons.MapPin />
+                  </div>
+                  <input
+                    type="text"
+                    value={editingCustomer.address}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
+                    placeholder="e.g. 142 Ocean View Ave, Cape Town"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-shark-500">
+                    <Icons.Phone />
+                  </div>
+                  <input
+                    type="tel"
+                    value={editingCustomer.phone}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                    placeholder="e.g. +27 82 123 4567"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">
+                  Notes & Collateral Details
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingCustomer.notes}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, notes: e.target.value })}
+                  placeholder="e.g. Employer, guarantor, or collateral notes..."
+                  className="w-full bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-xl p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerModal(false)}
+                  disabled={isSavingCustomer}
+                  className="flex-1 py-3 bg-slate-100 dark:bg-shark-700 hover:bg-slate-200 dark:hover:bg-shark-600 text-slate-700 dark:text-slate-300 font-semibold rounded-xl transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCustomer}
+                  className="flex-1 py-3 bg-money-600 hover:bg-money-500 text-white font-bold rounded-xl shadow-lg shadow-money-900/30 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                >
+                  {isSavingCustomer ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Check />
+                      <span>Save Customer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 overflow-auto pt-16 pb-20 md:pb-6 relative">
         <div className="p-6 max-w-6xl mx-auto space-y-8">
@@ -1773,19 +2359,44 @@ export default function App() {
                     return (
                       <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 hover:border-money-500 dark:hover:border-shark-600 transition-colors shadow-sm flex flex-col gap-4">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCustomerName(loan.customerId)}</h3>
-                              <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-500 dark:text-shark-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-shark-700">
-                                {activeMonthlyRate}%/mo
-                              </span>
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-shark-400 mt-1">
-                              Started {formatDate(loan.startDate)} • Initial: {activeInitialRate}%
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <CustomerAvatar
+                              customer={getCustomer(loan.customerId)}
+                              size="md"
+                              onClick={() => {
+                                const c = getCustomer(loan.customerId);
+                                if (c) handleOpenEditCustomerModal(c);
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const c = getCustomer(loan.customerId);
+                                    if (c) handleOpenEditCustomerModal(c);
+                                  }}
+                                  className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight hover:text-money-600 dark:hover:text-money-400 transition-colors text-left truncate"
+                                >
+                                  {getCustomerName(loan.customerId)}
+                                </button>
+                                <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-500 dark:text-shark-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-shark-700">
+                                  {activeMonthlyRate}%/mo
+                                </span>
+                              </div>
+                              {getCustomer(loan.customerId)?.address && (
+                                <div className="text-[11px] text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-0.5 truncate">
+                                  <Icons.MapPin />
+                                  <span className="truncate">{getCustomer(loan.customerId)?.address}</span>
+                                </div>
+                              )}
+                              <div className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
+                                Started {formatDate(loan.startDate)} • Initial: {activeInitialRate}%
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex gap-1 md:gap-2">
+                          <div className="flex gap-1 md:gap-2 shrink-0">
                             <button 
                               onClick={() => changeLoanStatus(loan.id, 'PAID')} 
                               title="Mark as Paid"
@@ -1844,23 +2455,48 @@ export default function App() {
                     return (
                       <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 flex flex-col gap-4 opacity-75 shadow-sm hover:opacity-100 transition-all duration-300">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCustomerName(loan.customerId)}</h3>
-                              <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-bold uppercase ${
-                                loan.status === 'PAID' 
-                                  ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30'
-                                  : 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30'
-                              }`}>
-                                {loan.status}
-                              </span>
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-shark-400 mt-1">
-                              Started {formatDate(loan.startDate)} • Notes: {loan.notes || "None"}
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <CustomerAvatar
+                              customer={getCustomer(loan.customerId)}
+                              size="md"
+                              onClick={() => {
+                                const c = getCustomer(loan.customerId);
+                                if (c) handleOpenEditCustomerModal(c);
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const c = getCustomer(loan.customerId);
+                                    if (c) handleOpenEditCustomerModal(c);
+                                  }}
+                                  className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight hover:text-money-600 dark:hover:text-money-400 transition-colors text-left truncate"
+                                >
+                                  {getCustomerName(loan.customerId)}
+                                </button>
+                                <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                                  loan.status === 'PAID' 
+                                    ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30'
+                                    : 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30'
+                                }`}>
+                                  {loan.status}
+                                </span>
+                              </div>
+                              {getCustomer(loan.customerId)?.address && (
+                                <div className="text-[11px] text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-0.5 truncate">
+                                  <Icons.MapPin />
+                                  <span className="truncate">{getCustomer(loan.customerId)?.address}</span>
+                                </div>
+                              )}
+                              <div className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
+                                Started {formatDate(loan.startDate)} • Notes: {loan.notes || "None"}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex gap-1 md:gap-2">
+                          <div className="flex gap-1 md:gap-2 shrink-0">
                             <button 
                               onClick={() => changeLoanStatus(loan.id, 'ACTIVE')} 
                               title="Re-activate Loan"
@@ -1905,18 +2541,180 @@ export default function App() {
             </>
           )}
 
-          {/* VIEW: LOANS & CUSTOMERS */}
+          {/* VIEW: CUSTOMER DIRECTORY & PROFILES */}
           {view === 'loans' && (
-            <div className="bg-white dark:bg-shark-800 rounded-2xl border border-slate-200 dark:border-shark-700 p-6 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Customer Directory</h2>
-              <div className="space-y-4">
-                {customers.map(c => (
-                  <div key={c.id} className="p-4 bg-slate-50 dark:bg-shark-900 rounded-lg border border-slate-200 dark:border-shark-700 flex justify-between items-center">
-                    <span className="font-medium text-lg text-slate-900 dark:text-slate-200">{c.name}</span>
-                    <span className="text-sm text-slate-500 dark:text-shark-500">{loans.filter(l => l.customerId === c.id).length} Active Loans</span>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Customer Directory</h2>
+                  <p className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">Manage borrower profiles, photos, residential addresses, and balances</p>
+                </div>
+
+                <div className="flex w-full sm:w-auto gap-3">
+                  <div className="relative flex-1 sm:w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Icons.Search />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search name or address..."
+                      value={customerSearchTerm}
+                      onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                    />
                   </div>
-                ))}
+                  <button
+                    onClick={handleOpenNewCustomerModal}
+                    className="bg-money-600 hover:bg-money-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-money-900/20 whitespace-nowrap text-sm font-semibold"
+                  >
+                    <Icons.UserPlus /> <span>New Customer</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Customer Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredCustomers.map(c => {
+                  const customerLoans = loans.filter(l => l.customerId === c.id);
+                  const activeCustLoans = customerLoans.filter(l => l.status === 'ACTIVE');
+                  const totalCustPrincipal = activeCustLoans.reduce((sum, l) => sum + l.principal, 0);
+                  const totalCustDebt = activeCustLoans.reduce((sum, l) => {
+                    const d = calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate);
+                    return sum + d.totalAmount;
+                  }, 0);
+
+                  return (
+                    <div
+                      key={c.id}
+                      className="bg-white dark:bg-shark-800 p-5 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-sm hover:border-money-500/50 transition-all flex flex-col justify-between gap-4 group"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="relative shrink-0">
+                          <CustomerAvatar
+                            customer={c}
+                            size="xl"
+                            onClick={() => handleOpenEditCustomerModal(c)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCustomerModal(c)}
+                            className="absolute -bottom-1 -right-1 p-1 bg-white dark:bg-shark-700 rounded-full border border-slate-200 dark:border-shark-600 text-slate-600 dark:text-slate-300 hover:text-money-500 shadow-sm transition-transform active:scale-95"
+                            title="Edit photo"
+                          >
+                            <Icons.Camera />
+                          </button>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            onClick={() => handleOpenEditCustomerModal(c)}
+                            className="font-bold text-lg text-slate-900 dark:text-white truncate cursor-pointer hover:text-money-600 dark:hover:text-money-400 transition-colors"
+                          >
+                            {c.name}
+                          </h3>
+
+                          {c.address ? (
+                            <div className="text-xs text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-1 truncate" title={c.address}>
+                              <Icons.MapPin />
+                              <span className="truncate">{c.address}</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenEditCustomerModal(c)}
+                              className="text-[11px] text-money-600 dark:text-money-400 hover:underline flex items-center gap-1 mt-1"
+                            >
+                              <Icons.MapPin /> + Add Address
+                            </button>
+                          )}
+
+                          {c.phone && (
+                            <div className="text-xs text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-0.5">
+                              <Icons.Phone />
+                              <span>{c.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Loan Stats */}
+                      <div className="grid grid-cols-2 gap-2 py-2 px-3 bg-slate-50 dark:bg-shark-900/60 rounded-xl border border-slate-100 dark:border-shark-700/50 text-xs">
+                        <div>
+                          <span className="text-slate-400 dark:text-shark-500 block text-[10px] uppercase">Active Loans</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{activeCustLoans.length} record(s)</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-400 dark:text-shark-500 block text-[10px] uppercase">Total Due</span>
+                          <span className="font-mono font-bold text-money-600 dark:text-money-400">
+                            {formatCurrency(totalCustDebt)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-shark-700/60">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              customerName: c.name,
+                              customerAddress: c.address || '',
+                              customerAvatar: c.avatar || '',
+                              customerPhone: c.phone || '',
+                            }));
+                            setView('entry');
+                            setEntryMode('manual');
+                          }}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-money-600 dark:text-money-400 hover:text-money-700 dark:hover:text-money-300 py-1"
+                        >
+                          <Icons.Plus /> <span>New Loan</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCustomerModal(c)}
+                            title="Edit Profile"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-shark-700 transition-colors"
+                          >
+                            <Icons.Edit />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomer(c.id, c.name)}
+                            title="Delete Customer"
+                            className="p-1.5 text-red-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredCustomers.length === 0 && (
+                <div className="text-center py-16 bg-white dark:bg-shark-800 rounded-2xl border border-slate-200 dark:border-shark-700 p-8 space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-shark-700 text-slate-400 dark:text-shark-400 flex items-center justify-center mx-auto">
+                    <Icons.User />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                      {customerSearchTerm ? 'No customers matching search' : 'No customers registered yet'}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-shark-400 mt-1 max-w-sm mx-auto">
+                      Add a customer profile with their photo and residential address to track their loans and credit status.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleOpenNewCustomerModal}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-money-600 hover:bg-money-500 text-white rounded-xl text-sm font-semibold shadow-md transition-colors"
+                  >
+                    <Icons.UserPlus /> <span>Add First Customer</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -2133,20 +2931,90 @@ export default function App() {
                   )}
 
                   <div className="space-y-5">
-                    {/* Customer Name with Datalist */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Name</label>
-                      <input
-                        list="customer-list"
-                        type="text"
-                        value={formData.customerName}
-                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                        placeholder="e.g. Tony Spilotro"
-                        className="w-full bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors"
-                      />
-                      <datalist id="customer-list">
-                        {customers.map(c => <option key={c.id} value={c.name} />)}
-                      </datalist>
+                    {/* Customer Identity & Profile Section */}
+                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-500 dark:text-shark-500 uppercase">Customer Profile & Photo</label>
+                        <span className="text-[10px] text-money-600 dark:text-money-400 bg-money-500/10 px-2 py-0.5 rounded-full font-medium">⚡ Direct Capture • Zero AI</span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        {/* Avatar Picker Preview */}
+                        <div className="relative shrink-0 flex items-center gap-3">
+                          <CustomerAvatar
+                            name={formData.customerName}
+                            avatar={formData.customerAvatar}
+                            size="xl"
+                          />
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startCamera('user', 'customer_avatar_form')}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-money-600 hover:bg-money-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95"
+                              >
+                                <Icons.Camera />
+                                <span>Take Photo</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => formAvatarFileInputRef.current?.click()}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-slate-200 dark:bg-shark-700 hover:bg-slate-300 dark:hover:bg-shark-600 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95"
+                              >
+                                <Icons.Upload />
+                                <span>Choose Image</span>
+                              </button>
+                              {formData.customerAvatar && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData(prev => ({ ...prev, customerAvatar: '' }))}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-xs"
+                                  title="Remove Photo"
+                                >
+                                  <Icons.X />
+                                </button>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 dark:text-shark-500">
+                              Attach customer profile picture (optional)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Customer Name with Datalist */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Name *</label>
+                        <input
+                          list="customer-list"
+                          type="text"
+                          required
+                          value={formData.customerName}
+                          onChange={(e) => handleCustomerNameChange(e.target.value)}
+                          placeholder="e.g. Tony Spilotro"
+                          className="w-full bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                        />
+                        <datalist id="customer-list">
+                          {customers.map(c => <option key={c.id} value={c.name} />)}
+                        </datalist>
+                      </div>
+
+                      {/* Customer Address Field */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Residential Address</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <Icons.MapPin />
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.customerAddress}
+                            onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
+                            placeholder="e.g. 142 Ocean View Ave, Cape Town"
+                            className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-5">

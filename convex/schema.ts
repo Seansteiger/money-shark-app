@@ -16,6 +16,9 @@ export default defineSchema({
   customers: defineTable({
     userId: v.id("users"),
     name: v.string(),
+    avatar: v.optional(v.string()),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
     notes: v.optional(v.string()),
   }).index("by_userId_name", ["userId", "name"]),
 

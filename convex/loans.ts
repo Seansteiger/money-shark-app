@@ -5,6 +5,9 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 export const create = mutation({
   args: {
     customerName: v.string(),
+    customerAddress: v.optional(v.string()),
+    customerAvatar: v.optional(v.string()),
+    customerPhone: v.optional(v.string()),
     principal: v.number(),
     initialInterestRate: v.number(),
     interestRate: v.number(),
@@ -36,15 +39,39 @@ export const create = mutation({
       customerId = await ctx.db.insert("customers", {
         userId,
         name: customerName,
+        address: args.customerAddress ? args.customerAddress.trim() : "",
+        avatar: args.customerAvatar || "",
+        phone: args.customerPhone ? args.customerPhone.trim() : "",
+        notes: "",
       });
       customer = {
         _id: customerId,
         userId,
         name: customerName,
+        address: args.customerAddress ? args.customerAddress.trim() : "",
+        avatar: args.customerAvatar || "",
+        phone: args.customerPhone ? args.customerPhone.trim() : "",
         notes: "",
       } as any;
     } else {
       customerId = customer._id;
+      // If customer was found but we now have address or avatar, update it
+      const updates: any = {};
+      if (args.customerAddress && (!customer.address || customer.address === "")) {
+        updates.address = args.customerAddress.trim();
+        customer.address = args.customerAddress.trim();
+      }
+      if (args.customerAvatar && (!customer.avatar || customer.avatar === "")) {
+        updates.avatar = args.customerAvatar;
+        customer.avatar = args.customerAvatar;
+      }
+      if (args.customerPhone && (!customer.phone || customer.phone === "")) {
+        updates.phone = args.customerPhone.trim();
+        customer.phone = args.customerPhone.trim();
+      }
+      if (Object.keys(updates).length > 0) {
+        await ctx.db.patch(customerId, updates);
+      }
     }
 
     // Create loan
@@ -65,6 +92,9 @@ export const create = mutation({
       customer: {
         id: customer!._id,
         name: customer!.name,
+        address: customer!.address || "",
+        avatar: customer!.avatar || "",
+        phone: customer!.phone || "",
         notes: customer!.notes || "",
       },
       loan: {

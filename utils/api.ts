@@ -12,6 +12,9 @@ export const saveSettings = async (settings: AppSettings) => {
 
 export const createLoan = async (payload: {
   customerName: string;
+  customerAddress?: string;
+  customerAvatar?: string;
+  customerPhone?: string;
   principal: number;
   initialInterestRate: number;
   interestRate: number;
@@ -21,6 +24,21 @@ export const createLoan = async (payload: {
   notes: string;
 }) => {
   return (await convex.mutation(api.loans.create, payload)) as { customer: Customer; loan: Loan };
+};
+
+export const saveCustomer = async (payload: {
+  id?: string;
+  name: string;
+  address?: string;
+  avatar?: string;
+  phone?: string;
+  notes?: string;
+}) => {
+  return (await convex.mutation(api.customers.saveCustomer, payload as any)) as Customer;
+};
+
+export const deleteCustomer = async (id: string) => {
+  return convex.mutation(api.customers.deleteCustomer, { id: id as any });
 };
 
 export const deleteLoan = async (id: string) => {

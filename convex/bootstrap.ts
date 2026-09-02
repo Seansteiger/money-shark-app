@@ -49,6 +49,9 @@ export const get = query({
       customers: sortedCustomers.map((c) => ({
         id: c._id,
         name: c.name,
+        avatar: c.avatar || "",
+        address: c.address || "",
+        phone: c.phone || "",
         notes: c.notes || "",
       })),
       loans: sortedLoans.map((l) => ({
