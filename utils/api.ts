@@ -49,6 +49,34 @@ export const updateLoanStatus = async (id: string, status: Loan['status']) => {
   return convex.mutation(api.loans.updateStatus, { id: id as any, status });
 };
 
+export const listTrash = async () => {
+  return convex.query(api.trash.listTrash);
+};
+
+export const restoreLoan = async (id: string) => {
+  return convex.mutation(api.trash.restoreLoan, { id: id as any });
+};
+
+export const restoreCustomer = async (id: string) => {
+  return convex.mutation(api.trash.restoreCustomer, { id: id as any });
+};
+
+export const restoreAllTrash = async () => {
+  return convex.mutation(api.trash.restoreAll);
+};
+
+export const permanentlyDeleteLoan = async (id: string) => {
+  return convex.mutation(api.trash.permanentlyDeleteLoan, { id: id as any });
+};
+
+export const permanentlyDeleteCustomer = async (id: string) => {
+  return convex.mutation(api.trash.permanentlyDeleteCustomer, { id: id as any });
+};
+
+export const emptyTrash = async () => {
+  return convex.mutation(api.trash.emptyTrash);
+};
+
 export const resetAllData = async () => {
   return convex.mutation(api.reset.resetData);
 };

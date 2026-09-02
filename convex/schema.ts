@@ -11,6 +11,7 @@ export default defineSchema({
     globalInterestRate: v.number(),
     globalCompoundMonthly: v.boolean(),
     isBiometricLockEnabled: v.optional(v.boolean()),
+    showHints: v.optional(v.boolean()),
   }).index("by_userId", ["userId"]),
 
   customers: defineTable({
@@ -20,6 +21,8 @@ export default defineSchema({
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     notes: v.optional(v.string()),
+    isDeleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
   }).index("by_userId_name", ["userId", "name"]),
 
   loans: defineTable({
@@ -33,6 +36,8 @@ export default defineSchema({
     isFixedRate: v.boolean(),
     status: v.union(v.literal("ACTIVE"), v.literal("PAID"), v.literal("DEFAULTED")),
     notes: v.optional(v.string()),
+    isDeleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
   }).index("by_userId", ["userId"]),
 
   passkeys: defineTable({

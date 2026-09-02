@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = {
   globalInterestRate: 30,
   globalCompoundMonthly: true,
   isBiometricLockEnabled: false,
+  showHints: true,
 };
 
 export const get = query({
@@ -32,10 +33,14 @@ export const get = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
 
+    // Filter out soft-deleted records (30-day recovery vault items)
+    const activeCustomers = customersDocs.filter((c) => !c.isDeleted);
+    const activeLoans = loansDocs.filter((l) => !l.isDeleted);
+
     // Sort loans by creation time descending
-    const sortedLoans = [...loansDocs].sort((a, b) => b._creationTime - a._creationTime);
+    const sortedLoans = [...activeLoans].sort((a, b) => b._creationTime - a._creationTime);
     // Sort customers by creation time descending
-    const sortedCustomers = [...customersDocs].sort((a, b) => b._creationTime - a._creationTime);
+    const sortedCustomers = [...activeCustomers].sort((a, b) => b._creationTime - a._creationTime);
 
     return {
       settings: settingsDoc
@@ -44,6 +49,7 @@ export const get = query({
             globalInterestRate: settingsDoc.globalInterestRate,
             globalCompoundMonthly: settingsDoc.globalCompoundMonthly,
             isBiometricLockEnabled: settingsDoc.isBiometricLockEnabled ?? false,
+            showHints: settingsDoc.showHints ?? true,
           }
         : DEFAULT_SETTINGS,
       customers: sortedCustomers.map((c) => ({

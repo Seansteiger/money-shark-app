@@ -15,7 +15,9 @@ export const list = query({
       .withIndex("by_userId_name", (q) => q.eq("userId", userId))
       .collect();
 
-    return customers.map((c) => ({
+    const activeCustomers = customers.filter((c) => !c.isDeleted);
+
+    return activeCustomers.map((c) => ({
       id: c._id,
       name: c.name,
       avatar: c.avatar || "",
@@ -158,7 +160,9 @@ export const deleteCustomer = mutation({
       throw new Error("Customer not found");
     }
 
-    // Also delete any associated loans
+    const now = Date.now();
+
+    // 30-Day Soft Delete for all associated loans
     const loans = await ctx.db
       .query("loans")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -166,10 +170,18 @@ export const deleteCustomer = mutation({
       .collect();
 
     for (const loan of loans) {
-      await ctx.db.delete(loan._id);
+      await ctx.db.patch(loan._id, {
+        isDeleted: true,
+        deletedAt: now,
+      });
     }
 
-    await ctx.db.delete(args.id);
+    // 30-Day Soft Delete for customer
+    await ctx.db.patch(args.id, {
+      isDeleted: true,
+      deletedAt: now,
+    });
+
     return { success: true };
   },
 });

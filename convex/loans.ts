@@ -128,7 +128,11 @@ export const deleteLoan = mutation({
       throw new Error("Loan not found");
     }
 
-    await ctx.db.delete(args.id);
+    // 30-Day Cloud Recovery Soft Delete
+    await ctx.db.patch(args.id, {
+      isDeleted: true,
+      deletedAt: Date.now(),
+    });
   },
 });
 

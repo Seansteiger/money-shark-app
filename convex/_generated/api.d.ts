@@ -17,6 +17,7 @@ import type * as passkeys from "../passkeys.js";
 import type * as reset from "../reset.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
+import type * as trash from "../trash.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   reset: typeof reset;
   seed: typeof seed;
   settings: typeof settings;
+  trash: typeof trash;
 }>;
 
 /**

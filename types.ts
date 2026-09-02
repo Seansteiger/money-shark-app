@@ -30,6 +30,37 @@ export interface AppSettings {
   globalInterestRate: number;
   globalCompoundMonthly: boolean;
   isBiometricLockEnabled?: boolean;
+  showHints?: boolean;
+}
+
+export interface TrashLoan {
+  id: string;
+  type: 'LOAN';
+  customerName: string;
+  principal: number;
+  startDate: string;
+  status: 'ACTIVE' | 'PAID' | 'DEFAULTED';
+  deletedAt: number;
+  daysRemaining: number;
+  isExpired: boolean;
+}
+
+export interface TrashCustomer {
+  id: string;
+  type: 'CUSTOMER';
+  name: string;
+  address?: string;
+  avatar?: string;
+  phone?: string;
+  deletedAt: number;
+  daysRemaining: number;
+  isExpired: boolean;
+}
+
+export interface TrashData {
+  loans: TrashLoan[];
+  customers: TrashCustomer[];
+  totalCount: number;
 }
 
 export interface UserPasskey {

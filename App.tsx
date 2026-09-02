@@ -76,6 +76,11 @@ const Icons = {
   Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
   Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   ZoomIn: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
+  HelpCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  Lightbulb: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+  Archive: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>,
+  Undo: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>,
+  Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
 };
 
 // Helper: Extract uppercase initials from customer name
@@ -210,13 +215,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   globalInterestRate: 30,
   globalCompoundMonthly: true,
   isBiometricLockEnabled: false,
+  showHints: true,
 };
 
 
 // Data source is the local API backend.
 
 export default function App() {
-  const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings' | 'trash'>('dashboard');
   const [entryMode, setEntryMode] = useState<'manual' | 'scan'>('manual');
 
   // Theme & Menu State
@@ -280,6 +286,22 @@ export default function App() {
   // Customer Management Mutations
   const saveCustomerMutation = useMutation(api.customers.saveCustomer);
   const deleteCustomerMutation = useMutation(api.customers.deleteCustomer);
+
+  // 30-Day Cloud Data Recovery & Trash Vault
+  const trashData = useQuery(api.trash.listTrash, isAuthenticated ? undefined : "skip");
+  const restoreLoanMutation = useMutation(api.trash.restoreLoan);
+  const restoreCustomerMutation = useMutation(api.trash.restoreCustomer);
+  const restoreAllTrashMutation = useMutation(api.trash.restoreAll);
+  const emptyTrashMutation = useMutation(api.trash.emptyTrash);
+  const permanentlyDeleteLoanMutation = useMutation(api.trash.permanentlyDeleteLoan);
+  const permanentlyDeleteCustomerMutation = useMutation(api.trash.permanentlyDeleteCustomer);
+  const [trashActionStatus, setTrashActionStatus] = useState('');
+  const [isRestoringTrash, setIsRestoringTrash] = useState(false);
+
+  // Interactive Hint & Walkthrough System State
+  const [showWalkthroughModal, setShowWalkthroughModal] = useState(false);
+  const [walkthroughStep, setWalkthroughStep] = useState(0);
+  const [dismissedDashboardHint, setDismissedDashboardHint] = useState(false);
 
   // Customer Management Modal State
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -1009,8 +1031,8 @@ export default function App() {
   const handleDeleteCustomer = async (id: string, name: string) => {
     const count = loans.filter((l) => l.customerId === id).length;
     const confirmMsg = count > 0
-      ? `Are you sure you want to delete ${name}? This will also delete ${count} associated loan record(s).`
-      : `Are you sure you want to delete ${name}?`;
+      ? `Move ${name} and ${count} associated loan(s) to the 30-Day Recovery Vault? (You can recover them anytime within 30 days).`
+      : `Move ${name} to the 30-Day Recovery Vault? (You can recover this borrower anytime within 30 days).`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -1018,9 +1040,102 @@ export default function App() {
       await deleteCustomerMutation({ id: id as any });
       setCustomers((prev) => prev.filter((c) => c.id !== id));
       setLoans((prev) => prev.filter((l) => l.customerId !== id));
+      setTrashActionStatus(`${name} moved to 30-Day Recovery Vault.`);
+      setTimeout(() => setTrashActionStatus(''), 4000);
     } catch (err) {
       console.error('Failed to delete customer:', err);
       alert('Could not delete customer.');
+    }
+  };
+
+  // --- 30-Day Cloud Recovery & Trash Vault Handlers ---
+  const handleRestoreLoan = async (id: string) => {
+    setIsRestoringTrash(true);
+    setTrashActionStatus('');
+    try {
+      await restoreLoanMutation({ id: id as any });
+      setTrashActionStatus('Loan restored back to your active records!');
+      setTimeout(() => setTrashActionStatus(''), 3500);
+    } catch (err: any) {
+      console.error('Failed to restore loan:', err);
+      alert('Could not restore loan record.');
+    } finally {
+      setIsRestoringTrash(false);
+    }
+  };
+
+  const handleRestoreCustomer = async (id: string) => {
+    setIsRestoringTrash(true);
+    setTrashActionStatus('');
+    try {
+      await restoreCustomerMutation({ id: id as any });
+      setTrashActionStatus('Borrower & associated loans restored to your active directory!');
+      setTimeout(() => setTrashActionStatus(''), 3500);
+    } catch (err: any) {
+      console.error('Failed to restore customer:', err);
+      alert('Could not restore borrower record.');
+    } finally {
+      setIsRestoringTrash(false);
+    }
+  };
+
+  const handleRestoreAllTrash = async () => {
+    if (!confirm('Restore all deleted records back to your active dashboard?')) return;
+    setIsRestoringTrash(true);
+    setTrashActionStatus('');
+    try {
+      await restoreAllTrashMutation();
+      setTrashActionStatus('All records have been restored successfully!');
+      setTimeout(() => setTrashActionStatus(''), 3500);
+    } catch (err: any) {
+      console.error('Failed to restore all trash:', err);
+      alert('Could not restore records.');
+    } finally {
+      setIsRestoringTrash(false);
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    if (!confirm('Are you sure you want to permanently empty the recovery vault? This cannot be undone.')) return;
+    try {
+      await emptyTrashMutation();
+      setTrashActionStatus('Recovery vault emptied.');
+      setTimeout(() => setTrashActionStatus(''), 3500);
+    } catch (err: any) {
+      console.error('Failed to empty recovery vault:', err);
+      alert('Could not empty recovery vault.');
+    }
+  };
+
+  const handlePermanentlyDeleteLoan = async (id: string) => {
+    if (!confirm('Permanently delete this loan record from the cloud? This action cannot be undone.')) return;
+    try {
+      await permanentlyDeleteLoanMutation({ id: id as any });
+    } catch (err: any) {
+      console.error('Failed to permanently delete loan:', err);
+      alert('Could not delete record.');
+    }
+  };
+
+  const handlePermanentlyDeleteCustomer = async (id: string) => {
+    if (!confirm('Permanently delete this borrower and their loan history? This action cannot be undone.')) return;
+    try {
+      await permanentlyDeleteCustomerMutation({ id: id as any });
+    } catch (err: any) {
+      console.error('Failed to permanently delete customer:', err);
+      alert('Could not delete borrower.');
+    }
+  };
+
+  // --- Interactive Hint & Walkthrough Preference Handler ---
+  const handleToggleHints = async (enable: boolean) => {
+    const updated = { ...settings, showHints: enable };
+    setSettings(updated);
+    setTempSettings(prev => ({ ...prev, showHints: enable }));
+    try {
+      await saveSettings(updated);
+    } catch (err) {
+      console.error('Failed to update hint preference:', err);
     }
   };
 
@@ -1352,10 +1467,12 @@ export default function App() {
   };
 
   const deleteLoan = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this record?")) return;
+    if (!confirm("Move this loan record to the 30-Day Recovery Vault? (You can recover it anytime within 30 days).")) return;
     try {
       await deleteLoanById(id);
       setLoans(loans.filter(l => l.id !== id));
+      setTrashActionStatus('Loan record moved to 30-Day Recovery Vault.');
+      setTimeout(() => setTrashActionStatus(''), 4000);
     } catch (err) {
       console.error("Delete failed", err);
     }
@@ -1371,16 +1488,23 @@ export default function App() {
     }
   };
 
-  const NavItem = ({ id, icon: Icon, label }: any) => (
+  const NavItem = ({ id, icon: Icon, label, badge }: any) => (
     <button
       onClick={() => { setView(id); setIsMenuOpen(false); }}
-      className={`flex items-center space-x-3 p-3 w-full rounded-xl transition-all duration-200 ${view === id
+      className={`flex items-center justify-between p-3 w-full rounded-xl transition-all duration-200 ${view === id
         ? 'bg-money-600 text-white shadow-lg shadow-money-900/20'
         : 'text-slate-500 hover:bg-slate-200 dark:text-shark-400 dark:hover:bg-shark-800 dark:hover:text-white'
         }`}
     >
-      <Icon />
-      <span className="font-medium">{label}</span>
+      <div className="flex items-center space-x-3">
+        <Icon />
+        <span className="font-medium">{label}</span>
+      </div>
+      {badge !== undefined && badge > 0 && (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${view === id ? 'bg-white text-money-700' : 'bg-money-500/20 text-money-400 border border-money-500/30'}`}>
+          {badge}
+        </span>
+      )}
     </button>
   );
 
@@ -1923,6 +2047,31 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {/* 30-Day Recovery Vault Quick Link */}
+          {trashData && trashData.totalCount > 0 && (
+            <button
+              onClick={() => setView('trash')}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold transition-all cursor-pointer shadow-sm animate-pulse"
+              title="View 30-Day Recovery Vault"
+            >
+              <Icons.Archive />
+              <span className="hidden sm:inline">Recovery Vault</span>
+              <span className="px-1.5 py-0.2 bg-amber-500/20 rounded-full font-bold">{trashData.totalCount}</span>
+            </button>
+          )}
+
+          {/* Interactive Guided Tour Quick Trigger */}
+          <button
+            onClick={() => {
+              setWalkthroughStep(0);
+              setShowWalkthroughModal(true);
+            }}
+            className="p-1.5 rounded-xl text-slate-500 hover:text-money-600 dark:hover:text-money-400 hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors cursor-pointer"
+            title="Interactive Setup Walkthrough & Hints"
+          >
+            <Icons.HelpCircle />
+          </button>
+
           {!isStandaloneApp && (
             <button
               onClick={handleInstallApp}
@@ -1980,9 +2129,40 @@ export default function App() {
             <NavItem id="loans" icon={Icons.Users} label="Loans & Customers" />
             <NavItem id="entry" icon={Icons.Plus} label="New Entry" />
             <NavItem id="settings" icon={Icons.Settings} label="Global Settings" />
+            <NavItem
+              id="trash"
+              icon={Icons.Archive}
+              label="30-Day Recovery Vault"
+              badge={trashData?.totalCount || 0}
+            />
           </nav>
 
           <div className="h-px bg-slate-200 dark:bg-shark-800"></div>
+
+          <div>
+            <h3 className="px-3 mb-3 text-xs font-bold text-slate-400 dark:text-shark-500 uppercase">Assistance & Hints</h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setWalkthroughStep(0);
+                  setShowWalkthroughModal(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-money-500/10 hover:bg-money-500/20 border border-money-500/30 text-money-700 dark:text-money-400 transition-all text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-money-600 dark:text-money-400">
+                    <Icons.Lightbulb />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">Interactive Walkthrough</div>
+                    <div className="text-[10px] text-slate-500 dark:text-shark-400">System setup & features tour</div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-money-600 dark:text-money-400">Start ›</span>
+              </button>
+            </div>
+          </div>
 
           <div>
             <h3 className="px-3 mb-3 text-xs font-bold text-slate-400 dark:text-shark-500 uppercase">Input Preferences</h3>
@@ -2260,6 +2440,266 @@ export default function App() {
         </div>
       )}
 
+      {/* INTERACTIVE MINIMALIST WALKTHROUGH TOUR MODAL */}
+      {showWalkthroughModal && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="absolute inset-0"
+            onClick={() => setShowWalkthroughModal(false)}
+          ></div>
+
+          <div className="relative z-10 max-w-lg w-full bg-shark-950/95 rounded-3xl border border-money-500/30 shadow-2xl p-6 sm:p-8 flex flex-col space-y-6 animate-in zoom-in-95 duration-200 text-white">
+            {/* Top Bar with Step Indicators */}
+            <div className="flex items-center justify-between pb-3 border-b border-shark-800">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-money-500/10 text-money-400 rounded-xl">
+                  <Icons.Lightbulb />
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-money-400">
+                  Setup Guide • Step {walkthroughStep + 1} of 4
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWalkthroughModal(false)}
+                className="p-1.5 text-shark-400 hover:text-white rounded-lg hover:bg-shark-800 transition-colors"
+                title="Close Tour"
+              >
+                <Icons.X />
+              </button>
+            </div>
+
+            {/* Stepper Dots */}
+            <div className="flex items-center justify-center gap-2">
+              {[0, 1, 2, 3].map((stepIdx) => (
+                <button
+                  key={stepIdx}
+                  type="button"
+                  onClick={() => setWalkthroughStep(stepIdx)}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                    walkthroughStep === stepIdx
+                      ? 'w-8 bg-money-500'
+                      : 'w-2 bg-shark-700 hover:bg-shark-600'
+                  }`}
+                  title={`Go to step ${stepIdx + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* Dynamic Step Content */}
+            {walkthroughStep === 0 && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-money-500/20 text-money-400 rounded-2xl">
+                    <Icons.Settings />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">1. Default Rates & Global Settings</h3>
+                    <p className="text-xs text-shark-400">Configure your business standard profit margins</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-shark-900/80 border border-shark-800 space-y-3 text-xs text-shark-300">
+                  <p>
+                    In <strong className="text-white">Global Settings</strong>, you define your baseline interest rates:
+                  </p>
+                  <ul className="space-y-2 list-none">
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Initial Markup (%):</strong> Immediate upfront fee charged on new loans (e.g. 50% means $1,000 principal becomes $1,500 total).</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Monthly Compounding (%):</strong> Rate compounded every 30 days on overdue balance (e.g. 30%/month).</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView('settings');
+                    setShowWalkthroughModal(false);
+                  }}
+                  className="w-full py-2.5 px-4 bg-money-600/20 hover:bg-money-600/30 text-money-300 border border-money-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icons.Settings /> <span>Take me to Global Settings</span>
+                </button>
+              </div>
+            )}
+
+            {walkthroughStep === 1 && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-money-500/20 text-money-400 rounded-2xl">
+                    <Icons.Users />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">2. Borrower Directory & Photos</h3>
+                    <p className="text-xs text-shark-400">Complete borrower profiles with physical address</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-shark-900/80 border border-shark-800 space-y-3 text-xs text-shark-300">
+                  <p>
+                    In <strong className="text-white">Loans & Customers</strong>, maintain client records:
+                  </p>
+                  <ul className="space-y-2 list-none">
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Portrait Camera:</strong> Snap client faces or upload existing pictures directly (100% on-device, zero AI cost).</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Full-Screen Photo Zoom:</strong> Click any customer avatar anytime across the app to view full-resolution photo and download it.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Physical Address & Notes:</strong> Keep track of residence and collateral notes.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView('loans');
+                    setShowWalkthroughModal(false);
+                  }}
+                  className="w-full py-2.5 px-4 bg-money-600/20 hover:bg-money-600/30 text-money-300 border border-money-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icons.Users /> <span>Open Customer Directory</span>
+                </button>
+              </div>
+            )}
+
+            {walkthroughStep === 2 && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-money-500/20 text-money-400 rounded-2xl">
+                    <Icons.Plus />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">3. Fast Loans & Camera AI Snap</h3>
+                    <p className="text-xs text-shark-400">Create records manually or scan handwritten ledgers</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-shark-900/80 border border-shark-800 space-y-3 text-xs text-shark-300">
+                  <p>
+                    Under <strong className="text-white">New Entry</strong>, record transactions quickly:
+                  </p>
+                  <ul className="space-y-2 list-none">
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Manual Fast Entry:</strong> Auto-populates your global default rates or allows custom loan terms.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Camera AI Scan:</strong> Snap a photo of a ledger notebook, receipt, or promissory note to automatically extract the borrower name, date, and amount.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView('entry');
+                    setShowWalkthroughModal(false);
+                  }}
+                  className="w-full py-2.5 px-4 bg-money-600/20 hover:bg-money-600/30 text-money-300 border border-money-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icons.Plus /> <span>Try New Loan Entry</span>
+                </button>
+              </div>
+            )}
+
+            {walkthroughStep === 3 && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-money-500/20 text-money-400 rounded-2xl">
+                    <Icons.Shield />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">4. 30-Day Recovery Vault & Security</h3>
+                    <p className="text-xs text-shark-400">Zero data loss safety guarantee and biometrics</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-shark-900/80 border border-shark-800 space-y-3 text-xs text-shark-300">
+                  <p>
+                    Your records and financial balances are safeguarded with multi-layer protection:
+                  </p>
+                  <ul className="space-y-2 list-none">
+                    <li className="flex items-start gap-2">
+                      <span className="text-emerald-400 font-bold">🛡️</span>
+                      <span><strong className="text-white">30-Day Cloud Recovery Vault:</strong> Deleted loans and borrower files are never lost immediately. They are preserved in your cloud vault for 30 days and can be restored in 1 click.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">🔐</span>
+                      <span><strong className="text-white">Hardware Biometric Shield:</strong> Protect your system using Touch ID, Face ID, or Windows Hello passkeys.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView('trash');
+                    setShowWalkthroughModal(false);
+                  }}
+                  className="w-full py-2.5 px-4 bg-money-600/20 hover:bg-money-600/30 text-money-300 border border-money-500/30 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icons.Archive /> <span>Open 30-Day Recovery Vault</span>
+                </button>
+              </div>
+            )}
+
+            {/* Bottom Controls */}
+            <div className="pt-2 flex items-center justify-between gap-3 border-t border-shark-800">
+              <button
+                type="button"
+                onClick={() => handleToggleHints(false)}
+                className="text-xs text-shark-400 hover:text-shark-200 transition-colors"
+                title="Turn off hints"
+              >
+                Turn off hints
+              </button>
+
+              <div className="flex items-center gap-2">
+                {walkthroughStep > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setWalkthroughStep(prev => prev - 1)}
+                    className="px-4 py-2 rounded-xl bg-shark-800 hover:bg-shark-700 text-xs font-semibold text-shark-300 hover:text-white transition-colors"
+                  >
+                    Back
+                  </button>
+                )}
+
+                {walkthroughStep < 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => setWalkthroughStep(prev => prev + 1)}
+                    className="px-5 py-2 rounded-xl bg-money-600 hover:bg-money-500 text-xs font-bold text-white transition-all shadow-md shadow-money-900/30"
+                  >
+                    Next Step ›
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowWalkthroughModal(false)}
+                    className="px-5 py-2 rounded-xl bg-money-600 hover:bg-money-500 text-xs font-bold text-white transition-all shadow-md shadow-money-900/30"
+                  >
+                    Finish Tour ✓
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CUSTOMER PROFILE MODAL (CREATE / EDIT CUSTOMER) */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2469,6 +2909,64 @@ export default function App() {
           {/* VIEW: DASHBOARD */}
           {view === 'dashboard' && (
             <>
+              {/* Status Notice Toast */}
+              {trashActionStatus && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 dark:text-emerald-400 text-xs font-semibold flex items-center justify-between shadow-sm animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2">
+                    <Icons.Shield />
+                    <span>{trashActionStatus}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setView('trash')}
+                    className="underline text-[11px] hover:text-emerald-300 ml-2"
+                  >
+                    View Vault
+                  </button>
+                </div>
+              )}
+
+              {/* Contextual Setup Hint Banner */}
+              {settings.showHints !== false && !dismissedDashboardHint && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-money-500/10 via-money-500/5 to-transparent border border-money-500/30 flex items-start sm:items-center justify-between gap-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 bg-money-500/20 text-money-600 dark:text-money-400 rounded-xl shrink-0">
+                      <Icons.Lightbulb />
+                    </div>
+                    <div className="text-xs text-slate-700 dark:text-shark-300 min-w-0">
+                      <strong className="text-slate-900 dark:text-white font-semibold">Quick Setup Hint:</strong>{' '}
+                      You can set your default 50% upfront markup & 30% compounding rate in{' '}
+                      <button
+                        onClick={() => setView('settings')}
+                        className="text-money-600 dark:text-money-400 font-bold hover:underline inline"
+                      >
+                        Global Settings
+                      </button>
+                      . Need assistance?{' '}
+                      <button
+                        onClick={() => {
+                          setWalkthroughStep(0);
+                          setShowWalkthroughModal(true);
+                        }}
+                        className="text-money-600 dark:text-money-400 font-bold hover:underline inline"
+                      >
+                        Launch Interactive Tour
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDismissedDashboardHint(true)}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition-colors"
+                      title="Dismiss Hint"
+                    >
+                      <Icons.X />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                 <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
                   <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Total Deployed</h3>
@@ -3413,6 +3911,26 @@ export default function App() {
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
 
+                {/* Interest Rates Explainer Box */}
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-2 text-xs text-slate-600 dark:text-shark-300">
+                  <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-white">
+                    <span className="text-money-500"><Icons.Lightbulb /></span>
+                    <span>How Your Profit Calculations Work:</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="p-3 bg-white dark:bg-shark-800 rounded-lg border border-slate-200 dark:border-shark-700">
+                      <span className="font-bold text-money-600 dark:text-money-400 block mb-1">🏷️ Initial Markup (e.g. {tempSettings.globalInitialInterestRate}%)</span>
+                      <span>Added immediately when a loan is issued. For instance, a R1,000 principal at {tempSettings.globalInitialInterestRate}% becomes R{1000 * (1 + (tempSettings.globalInitialInterestRate || 50) / 100)} total starting balance.</span>
+                    </div>
+                    <div className="p-3 bg-white dark:bg-shark-800 rounded-lg border border-slate-200 dark:border-shark-700">
+                      <span className="font-bold text-money-600 dark:text-money-400 block mb-1">📈 Monthly Compounding (e.g. {tempSettings.globalInterestRate}%)</span>
+                      <span>After the first 30 days, every additional month compounds an extra {tempSettings.globalInterestRate}% on the outstanding balance.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
+
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-slate-900 dark:text-white">Compound Interest Mode</h3>
@@ -3424,6 +3942,88 @@ export default function App() {
                   >
                     <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.globalCompoundMonthly ? 'translate-x-6' : 'translate-x-0'}`}></div>
                   </button>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
+
+                {/* INTERACTIVE GUIDANCE & HINTS */}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-money-500"><Icons.Lightbulb /></span>
+                        <h3 className="font-bold text-slate-900 dark:text-white">Interactive Setup Hints & Guidance</h3>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
+                        Display helpful setup reminders, rate hints, and feature tooltips throughout the app.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTempSettings({ ...tempSettings, showHints: tempSettings.showHints === false ? true : false })}
+                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${tempSettings.showHints !== false ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.showHints !== false ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="text-slate-600 dark:text-shark-300">
+                      Need a complete interactive walkthrough of rates, customers, AI receipts, and security?
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWalkthroughStep(0);
+                        setShowWalkthroughModal(true);
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-money-600 hover:bg-money-500 text-white font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                    >
+                      <Icons.Lightbulb />
+                      <span>Launch Interactive Tour</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
+
+                {/* 30-DAY CLOUD DATA RECOVERY VAULT CARD */}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-500"><Icons.Shield /></span>
+                        <h3 className="font-bold text-slate-900 dark:text-white">30-Day Cloud Data Recovery Vault</h3>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
+                        Zero data loss protection: All deleted loans and client records are stored safely for 30 days.
+                      </p>
+                    </div>
+
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full shrink-0">
+                      🛡️ Protected
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {trashData && trashData.totalCount > 0
+                          ? `Currently holding ${trashData.totalCount} recoverable record(s)`
+                          : 'Recovery Vault is clean (No deleted records)'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setView('trash')}
+                      className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                    >
+                      <Icons.Archive />
+                      <span>Open Recovery Vault ({trashData?.totalCount || 0})</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
@@ -3557,23 +4157,246 @@ export default function App() {
                 </h2>
                 <div className="space-y-4 text-sm text-slate-600 dark:text-shark-300">
                   <div className="p-3 bg-slate-50 dark:bg-shark-900 rounded-lg border border-slate-200 dark:border-shark-700">
-                    <strong className="block text-shark-800 dark:text-white mb-1">1. Dashboard Overview</strong>
-                    View total deployed capital, accrued interest, and list of all active loans. Use the search bar to find specific debts.
+                    <strong className="block text-shark-800 dark:text-white mb-1">1. Dashboard Overview & Real-Time Tracking</strong>
+                    View total deployed capital, accrued interest, and active debt ledgers. Search by borrower name, address, or transaction date.
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-shark-900 rounded-lg border border-slate-200 dark:border-shark-700">
-                    <strong className="block text-shark-800 dark:text-white mb-1">2. Creating Entries</strong>
-                    You can manually input loan details or use the <strong>Scan Receipt</strong> feature. Scanning uploads the image temporarily for analysis, extracts the data, and then deletes the image for privacy.
+                    <strong className="block text-shark-800 dark:text-white mb-1">2. Creating Entries & Camera OCR</strong>
+                    Input records manually or snap paper contracts/handwritten ledgers. Optical recognition extracts names, amounts, and dates automatically.
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-shark-900 rounded-lg border border-slate-200 dark:border-shark-700">
-                    <strong className="block text-shark-800 dark:text-white mb-1">3. Managing Customers</strong>
-                    The "Loans & Customers" view lists all active clients. Deleting a loan removes it from the database permanently.
+                    <strong className="block text-shark-800 dark:text-white mb-1">3. Customer Profiles & Direct Camera Photos</strong>
+                    Store full borrower dossiers with residence addresses and portrait photographs. Tap any photo to zoom in full-screen or download.
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-shark-900 rounded-lg border border-slate-200 dark:border-shark-700">
-                    <strong className="block text-shark-800 dark:text-white mb-1">4. Global Settings</strong>
-                    Configure default interest rates here. "Initial Interest" is the upfront fee (vig), and "Monthly Compounding" applies every 30 days thereafter.
+                    <strong className="block text-shark-800 dark:text-white mb-1">4. Zero-Loss Data Protection & 30-Day Recovery Vault</strong>
+                    Deleted records are never immediately erased. They are archived in your secure cloud recovery vault for 30 days and can be restored with 1 click.
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-shark-900 rounded-lg border border-slate-200 dark:border-shark-700">
+                    <strong className="block text-shark-800 dark:text-white mb-1">5. Biometric Passkey Security</strong>
+                    Protect your financial data by enrolling Touch ID, Face ID, or Windows Hello hardware passkeys.
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* VIEW: 30-DAY CLOUD DATA RECOVERY VAULT (TRASH BIN) */}
+          {view === 'trash' && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl border border-amber-500/20">
+                    <Icons.Shield />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>30-Day Data Recovery Vault</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
+                      Deleted loans and borrower records are safely held for 30 days before permanent purging.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  {trashData && trashData.totalCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleRestoreAllTrash}
+                      disabled={isRestoringTrash}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-money-600 hover:bg-money-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Icons.Undo />
+                      <span>Restore Everything ({trashData.totalCount})</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setView('dashboard')}
+                    className="px-4 py-2 bg-slate-200 dark:bg-shark-800 hover:bg-slate-300 dark:hover:bg-shark-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                  >
+                    Back to Overview
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Toast */}
+              {trashActionStatus && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold animate-in fade-in duration-200">
+                  {trashActionStatus}
+                </div>
+              )}
+
+              {/* Safety Guarantee Info Banner */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-shark-800/60 border border-slate-200 dark:border-shark-700 flex items-start gap-3">
+                <div className="text-money-500 shrink-0 mt-0.5">
+                  <Icons.CheckCircle />
+                </div>
+                <div className="text-xs text-slate-600 dark:text-shark-300 space-y-1">
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    Cloud Data Protection Active
+                  </p>
+                  <p>
+                    If an entry was deleted accidentally or by mistake, you have a full 30-day window to restore it. 
+                    Restoring a loan or borrower immediately brings all historical records, balances, and calculations back onto your dashboard with zero data loss.
+                  </p>
+                </div>
+              </div>
+
+              {/* Deleted Loans Section */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-shark-500 flex items-center justify-between">
+                  <span>Deleted Loan Records ({trashData?.loans?.length || 0})</span>
+                </h3>
+
+                <div className="grid gap-3">
+                  {trashData?.loans?.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-white dark:bg-shark-800 p-4 rounded-2xl border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="p-2.5 bg-red-500/10 text-red-500 rounded-xl shrink-0">
+                          <Icons.Clock />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-base text-slate-900 dark:text-white truncate">
+                              {item.customerName}
+                            </span>
+                            <span className="font-mono font-semibold text-money-600 dark:text-money-400 text-sm">
+                              {formatCurrency(item.principal)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-shark-400 flex items-center gap-2 mt-0.5">
+                            <span>Started: {formatDate(item.startDate)}</span>
+                            <span>•</span>
+                            <span>Deleted: {new Date(item.deletedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                          item.daysRemaining > 10
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                        }`}>
+                          ⏳ {item.daysRemaining} days left to recover
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreLoan(item.id)}
+                          disabled={isRestoringTrash}
+                          className="px-3 py-1.5 bg-money-600 hover:bg-money-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                          title="Restore this loan record"
+                        >
+                          <Icons.Undo />
+                          <span>Restore</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePermanentlyDeleteLoan(item.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                          title="Permanently Purge"
+                        >
+                          <Icons.Trash />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!trashData?.loans || trashData.loans.length === 0) && (
+                    <div className="p-6 text-center text-xs text-slate-400 dark:text-shark-500 bg-white dark:bg-shark-800/40 rounded-2xl border border-slate-200 dark:border-shark-700 border-dashed">
+                      No deleted loans in the recovery vault.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Deleted Customers Section */}
+              <div className="space-y-3 pt-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-shark-500">
+                  <span>Deleted Borrower Profiles ({trashData?.customers?.length || 0})</span>
+                </h3>
+
+                <div className="grid gap-3">
+                  {trashData?.customers?.map((cust) => (
+                    <div
+                      key={cust.id}
+                      className="bg-white dark:bg-shark-800 p-4 rounded-2xl border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <CustomerAvatar customer={cust} size="md" />
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-base text-slate-900 dark:text-white truncate">
+                            {cust.name}
+                          </h4>
+                          {cust.address && (
+                            <p className="text-xs text-slate-500 dark:text-shark-400 flex items-center gap-1 truncate">
+                              <Icons.MapPin />
+                              <span className="truncate">{cust.address}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                          cust.daysRemaining > 10
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                        }`}>
+                          ⏳ {cust.daysRemaining} days left
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreCustomer(cust.id)}
+                          disabled={isRestoringTrash}
+                          className="px-3 py-1.5 bg-money-600 hover:bg-money-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                          title="Restore borrower and associated loans"
+                        >
+                          <Icons.Undo />
+                          <span>Restore Borrower</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePermanentlyDeleteCustomer(cust.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                          title="Permanently Purge"
+                        >
+                          <Icons.Trash />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!trashData?.customers || trashData.customers.length === 0) && (
+                    <div className="p-6 text-center text-xs text-slate-400 dark:text-shark-500 bg-white dark:bg-shark-800/40 rounded-2xl border border-slate-200 dark:border-shark-700 border-dashed">
+                      No deleted borrower profiles in the recovery vault.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {trashData && trashData.totalCount > 0 && (
+                <div className="flex justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={handleEmptyTrash}
+                    className="text-xs text-red-500 hover:text-red-600 font-semibold flex items-center gap-1.5 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
+                  >
+                    <Icons.Trash />
+                    <span>Empty Recovery Vault Permanently</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
