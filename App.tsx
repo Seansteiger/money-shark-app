@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { useQuery, useMutation } from 'convex/react';
 import { api } from './convex/_generated/api';
 
-import { Customer, Loan, InterestType, AppSettings, UserPasskey } from './types';
+import { Customer, Loan, InterestType, AppSettings, UserPasskey, Repayment, PaymentMethod } from './types';
 import {
   isBiometricSupported,
   registerDevicePasskey,
@@ -11,7 +11,7 @@ import {
   saveLocalBiometricState,
   getLocalBiometricState,
 } from './utils/webauthn';
-import { calculateLoanDetails, formatCurrency, formatDate } from './utils/calculations';
+import { calculateLoanDetails, formatCurrency, formatDate, LoanCalculations } from './utils/calculations';
 import {
   createLoan,
   deleteLoan as deleteLoanById,
@@ -19,6 +19,8 @@ import {
   saveSettings,
   updateLoanStatus,
   seedDemoData,
+  recordPayment,
+  deletePayment as deletePaymentById,
 } from './utils/api';
 import {
   saveCachedSnapshot,
@@ -31,6 +33,9 @@ import {
   clearAllDeviceStorage,
 } from './utils/storage';
 import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
+import { PaymentModal } from './components/PaymentModal';
+import { PortfolioAnalytics } from './components/PortfolioAnalytics';
+import { exportPortfolioToCsv } from './utils/exportCsv';
 
 
 // Icons
@@ -274,6 +279,10 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [repayments, setRepayments] = useState<Repayment[]>([]);
+  const [paymentModalLoan, setPaymentModalLoan] = useState<Loan | null>(null);
+  const [loanFilterTab, setLoanFilterTab] = useState<'ALL' | 'GRACE' | 'COMPOUNDING' | 'OVERDUE'>('ALL');
+  const [loanSortBy, setLoanSortBy] = useState<'BALANCE_DESC' | 'DUE_SOONEST' | 'NEWEST' | 'NAME'>('BALANCE_DESC');
   const [loading, setLoading] = useState(true);
   const [isDeviceHydrated, setIsDeviceHydrated] = useState(false);
   const liveData = useQuery(api.bootstrap.get, isAuthenticated ? undefined : "skip");
@@ -395,6 +404,7 @@ export default function App() {
           if (cached.settings) setSettings(cached.settings);
           if (cached.customers?.length) setCustomers(cached.customers);
           if (cached.loans?.length) setLoans(cached.loans);
+          if (cached.repayments?.length) setRepayments(cached.repayments);
           setLoading(false);
         }
 
@@ -421,6 +431,8 @@ export default function App() {
       setSettings(liveData.settings);
       setCustomers(liveData.customers);
       setLoans(liveData.loans as any[]);
+      const liveRepayments = (liveData as any).repayments || [];
+      setRepayments(liveRepayments);
       setLoading(false);
 
       // Cache snapshot to on-device IndexedDB
@@ -428,6 +440,7 @@ export default function App() {
         settings: liveData.settings,
         customers: liveData.customers,
         loans: liveData.loans as any[],
+        repayments: liveRepayments,
       }).catch((e) => console.warn('Failed to mirror to device storage:', e));
     }
   }, [liveData]);
@@ -1162,28 +1175,153 @@ export default function App() {
     }
   };
 
+  // --- Payment Handlers ---
+  const handleRecordPayment = async (data: {
+    loanId: string;
+    amount: number;
+    paymentDate: string;
+    paymentMethod: PaymentMethod;
+    notes: string;
+  }) => {
+    try {
+      const res = await recordPayment({
+        loanId: data.loanId,
+        amount: data.amount,
+        paymentDate: data.paymentDate,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes,
+      });
+
+      const newRepayment: Repayment = {
+        id: res.id || `repay_${Date.now()}`,
+        loanId: data.loanId,
+        customerId: res.customerId || '',
+        amount: data.amount,
+        paymentDate: data.paymentDate,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes,
+        createdAt: Date.now(),
+      };
+
+      const updatedRepayments = [newRepayment, ...repayments.filter((r) => r.id !== newRepayment.id)];
+      setRepayments(updatedRepayments);
+
+      let updatedLoans = loans;
+      if (res.isFullyPaid) {
+        updatedLoans = loans.map((l) => (l.id === data.loanId ? { ...l, status: 'PAID' as const } : l));
+        setLoans(updatedLoans);
+      }
+
+      saveCachedSnapshot({
+        settings,
+        customers,
+        loans: updatedLoans,
+        repayments: updatedRepayments,
+      }).catch(() => {});
+    } catch (err: any) {
+      console.error('Failed to record payment:', err);
+      throw err;
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      await deletePaymentById(paymentId);
+      const targetRepayment = repayments.find((r) => r.id === paymentId);
+      const updatedRepayments = repayments.filter((r) => r.id !== paymentId);
+      setRepayments(updatedRepayments);
+
+      let updatedLoans = loans;
+      if (targetRepayment) {
+        const targetLoan = loans.find((l) => l.id === targetRepayment.loanId);
+        if (targetLoan && targetLoan.status === 'PAID') {
+          const calc = calculateLoanDetails(
+            targetLoan,
+            settings.globalInitialInterestRate,
+            settings.globalInterestRate,
+            updatedRepayments
+          );
+          if (calc.remainingBalance > 0.01) {
+            updatedLoans = loans.map((l) => (l.id === targetLoan.id ? { ...l, status: 'ACTIVE' as const } : l));
+            setLoans(updatedLoans);
+            updateLoanStatus(targetLoan.id, 'ACTIVE').catch(() => {});
+          }
+        }
+      }
+
+      saveCachedSnapshot({
+        settings,
+        customers,
+        loans: updatedLoans,
+        repayments: updatedRepayments,
+      }).catch(() => {});
+    } catch (err: any) {
+      console.error('Failed to delete payment:', err);
+      throw err;
+    }
+  };
+
   // --- Calculations ---
-  const activeLoans = loans.filter(l => l.status === 'ACTIVE');
+  const activeLoans = loans.filter((l) => l.status === 'ACTIVE');
   const totalPrincipal = activeLoans.reduce((sum, l) => sum + l.principal, 0);
 
-  const loanCalculations = activeLoans.map(l => {
-    return calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate);
+  const loanCalculations = activeLoans.map((l) => {
+    return calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
   });
 
   const totalInterest = loanCalculations.reduce((sum, c) => sum + c.interestAccrued, 0);
   const totalValue = totalPrincipal + totalInterest;
 
-  // Filter Active Loans based on Search Term
-  const filteredActiveLoans = activeLoans.filter(loan => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    const customer = getCustomer(loan.customerId);
-    const customerName = (customer?.name || '').toLowerCase();
-    const customerAddress = (customer?.address || '').toLowerCase();
-    const dateRaw = loan.startDate;
-    const dateFormatted = formatDate(loan.startDate).toLowerCase();
-    return customerName.includes(term) || customerAddress.includes(term) || dateRaw.includes(term) || dateFormatted.includes(term);
-  });
+  // Filter & Sort Active Loans based on Search Term, Risk Tab, and Sort Order
+  const filteredActiveLoans = activeLoans
+    .filter((loan) => {
+      const calc = calculateLoanDetails(
+        loan,
+        settings.globalInitialInterestRate,
+        settings.globalInterestRate,
+        repayments
+      );
+
+      // Filter Tab logic
+      if (loanFilterTab === 'GRACE' && calc.riskCategory !== 'GRACE_PERIOD') return false;
+      if (loanFilterTab === 'COMPOUNDING' && calc.riskCategory !== 'COMPOUNDING_1') return false;
+      if (loanFilterTab === 'OVERDUE' && calc.riskCategory !== 'OVERDUE_HIGH_RISK') return false;
+
+      // Search term logic
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      const customer = getCustomer(loan.customerId);
+      const customerName = (customer?.name || '').toLowerCase();
+      const customerAddress = (customer?.address || '').toLowerCase();
+      const dateRaw = loan.startDate;
+      const dateFormatted = formatDate(loan.startDate).toLowerCase();
+      return (
+        customerName.includes(term) ||
+        customerAddress.includes(term) ||
+        dateRaw.includes(term) ||
+        dateFormatted.includes(term)
+      );
+    })
+    .sort((a, b) => {
+      const calcA = calculateLoanDetails(a, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+      const calcB = calculateLoanDetails(b, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+
+      if (loanSortBy === 'BALANCE_DESC') {
+        return calcB.remainingBalance - calcA.remainingBalance;
+      }
+      if (loanSortBy === 'DUE_SOONEST') {
+        return calcA.daysUntilNextCycle - calcB.daysUntilNextCycle;
+      }
+      if (loanSortBy === 'NEWEST') {
+        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      }
+      if (loanSortBy === 'NAME') {
+        const nameA = getCustomerName(a.customerId).toLowerCase();
+        const nameB = getCustomerName(b.customerId).toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+      return 0;
+    });
 
   // Filter Customers for Directory View
   const filteredCustomers = customers.filter(c => {
@@ -2961,58 +3099,130 @@ export default function App() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
-                  <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Total Deployed</h3>
-                  <div className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalPrincipal)}</div>
-                </div>
-                <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
-                  <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Accrued Interest</h3>
-                  <div className="text-xl md:text-3xl font-bold text-money-600 dark:text-money-500">+{formatCurrency(totalInterest)}</div>
-                  <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 mt-1">Based on current rates</div>
-                </div>
-                <div className="bg-white dark:bg-shark-800 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300 col-span-2 md:col-span-1">
-                  <h3 className="text-slate-400 dark:text-shark-400 text-xs md:text-sm font-medium uppercase tracking-wider mb-2">Total Value</h3>
-                  <div className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalValue)}</div>
-                </div>
-              </div>
+              <PortfolioAnalytics
+                loans={loans}
+                customers={customers}
+                repayments={repayments}
+                settings={settings}
+                onExportCsv={() => exportPortfolioToCsv(loans, customers, repayments, settings)}
+              />
 
-              <div className="mt-8">
-                <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Active Loans</h2>
+              <div className="mt-8 space-y-4">
+                <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Active Loan Portfolio</h2>
+                    <p className="text-xs text-slate-500 dark:text-shark-400">
+                      Track compounding cycles, collect installments, and monitor outstanding risk.
+                    </p>
+                  </div>
 
-                  <div className="flex flex-1 w-full md:w-auto gap-3">
-                    <div className="relative flex-1 md:max-w-md ml-auto">
+                  <div className="flex flex-1 w-full lg:w-auto gap-3 items-center">
+                    <div className="relative flex-1 lg:max-w-xs">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                         <Icons.Search />
                       </div>
                       <input
                         type="text"
-                        placeholder="Search name or date..."
+                        placeholder="Search borrower or date..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
                       />
                     </div>
-                    <button onClick={() => setView('entry')} className="bg-money-600 hover:bg-money-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-money-900/20 whitespace-nowrap">
-                      <Icons.Plus /> <span className="hidden sm:inline">New Record</span>
+
+                    <select
+                      value={loanSortBy}
+                      onChange={(e) => setLoanSortBy(e.target.value as any)}
+                      className="px-3 py-2 bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-shark-200 focus:border-money-500 outline-none transition-colors cursor-pointer"
+                    >
+                      <option value="BALANCE_DESC">Highest Balance</option>
+                      <option value="DUE_SOONEST">Compounding Soonest</option>
+                      <option value="NEWEST">Newest First</option>
+                      <option value="NAME">Borrower Name (A-Z)</option>
+                    </select>
+
+                    <button
+                      onClick={() => setView('entry')}
+                      className="bg-money-600 hover:bg-money-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-money-900/20 whitespace-nowrap text-xs sm:text-sm font-bold active:scale-95"
+                    >
+                      <Icons.Plus /> <span className="hidden sm:inline">New Loan</span>
                     </button>
                   </div>
                 </div>
 
+                {/* Risk Filter Tabs */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setLoanFilterTab('ALL')}
+                    className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                      loanFilterTab === 'ALL'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md font-bold'
+                        : 'bg-slate-100 dark:bg-shark-800/80 text-slate-600 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    All Active ({activeLoans.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoanFilterTab('GRACE')}
+                    className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      loanFilterTab === 'GRACE'
+                        ? 'bg-emerald-600 text-white shadow-md font-bold'
+                        : 'bg-slate-100 dark:bg-shark-800/80 text-slate-600 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Grace Period (0–30d)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoanFilterTab('COMPOUNDING')}
+                    className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      loanFilterTab === 'COMPOUNDING'
+                        ? 'bg-amber-600 text-white shadow-md font-bold'
+                        : 'bg-slate-100 dark:bg-shark-800/80 text-slate-600 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Compounding (Cycle 2)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoanFilterTab('OVERDUE')}
+                    className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      loanFilterTab === 'OVERDUE'
+                        ? 'bg-rose-600 text-white shadow-md font-bold'
+                        : 'bg-slate-100 dark:bg-shark-800/80 text-slate-600 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>High Risk (60+ days)</span>
+                  </button>
+                </div>
+
                 <div className="grid gap-4">
                   {filteredActiveLoans.map((loan) => {
-                    const calc = calculateLoanDetails(loan, settings.globalInitialInterestRate, settings.globalInterestRate);
+                    const calc = calculateLoanDetails(
+                      loan,
+                      settings.globalInitialInterestRate,
+                      settings.globalInterestRate,
+                      repayments
+                    );
                     const activeInitialRate = loan.isFixedRate ? settings.globalInitialInterestRate : loan.initialInterestRate;
                     const activeMonthlyRate = loan.isFixedRate ? settings.globalInterestRate : loan.interestRate;
 
                     return (
-                      <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 hover:border-money-500 dark:hover:border-shark-600 transition-colors shadow-sm flex flex-col gap-4">
-                        <div className="flex justify-between items-start">
+                      <div
+                        key={loan.id}
+                        className="bg-white dark:bg-shark-800 p-5 rounded-2xl border border-slate-200 dark:border-shark-700 hover:border-emerald-500/50 dark:hover:border-emerald-500/30 transition-all shadow-sm flex flex-col gap-4"
+                      >
+                        {/* Top Row: Borrower Info & Action Buttons */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                           <div className="flex items-center gap-3.5 min-w-0">
                             <CustomerAvatar
                               customer={getCustomer(loan.customerId)}
-                              size="md"
+                              size="lg"
                               showHoverZoom={Boolean(getCustomer(loan.customerId)?.avatar)}
                               onClick={() => {
                                 const c = getCustomer(loan.customerId);
@@ -3037,11 +3247,11 @@ export default function App() {
                                     const c = getCustomer(loan.customerId);
                                     if (c) handleOpenEditCustomerModal(c);
                                   }}
-                                  className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight hover:text-money-600 dark:hover:text-money-400 transition-colors text-left truncate"
+                                  className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left truncate"
                                 >
                                   {getCustomerName(loan.customerId)}
                                 </button>
-                                <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-500 dark:text-shark-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-shark-700">
+                                <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-600 dark:text-shark-300 font-semibold px-2 py-0.5 rounded-md border border-slate-200 dark:border-shark-700">
                                   {activeMonthlyRate}%/mo
                                 </span>
                               </div>
@@ -3052,56 +3262,118 @@ export default function App() {
                                 </div>
                               )}
                               <div className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
-                                Started {formatDate(loan.startDate)} • Initial: {activeInitialRate}%
+                                Issued {formatDate(loan.startDate)} • Markup: {activeInitialRate}%
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex gap-1 md:gap-2 shrink-0">
-                            <button 
-                              onClick={() => changeLoanStatus(loan.id, 'PAID')} 
-                              title="Mark as Paid"
-                              className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-100/50 dark:hover:bg-green-950/30 rounded-lg transition-colors"
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentModalLoan(loan)}
+                              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                              title="Record an installment payment"
+                            >
+                              <span>💰</span>
+                              <span>Record Payment</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => changeLoanStatus(loan.id, 'PAID')}
+                              title="Mark as Paid in Full"
+                              className="p-2 text-green-600 dark:text-green-400 hover:bg-green-100/50 dark:hover:bg-green-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-green-500/20"
                             >
                               <Icons.Check />
                             </button>
-                            <button 
-                              onClick={() => changeLoanStatus(loan.id, 'DEFAULTED')} 
+                            <button
+                              type="button"
+                              onClick={() => changeLoanStatus(loan.id, 'DEFAULTED')}
                               title="Mark as Defaulted"
-                              className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-100/50 dark:hover:bg-orange-950/30 rounded-lg transition-colors"
+                              className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-100/50 dark:hover:bg-orange-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-orange-500/20"
                             >
                               <Icons.X />
                             </button>
-                            <button 
-                              onClick={() => deleteLoan(loan.id)} 
-                              title="Delete Record"
-                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                            <button
+                              type="button"
+                              onClick={() => deleteLoan(loan.id)}
+                              title="Delete Record (moves to 30-day recovery vault)"
+                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-500/20"
                             >
                               <Icons.Trash />
                             </button>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 w-full pt-3 border-t border-slate-100 dark:border-shark-800/80 md:border-t-0 md:pt-0 md:flex md:items-center md:justify-end md:gap-8 md:w-auto ml-auto">
-                          <div className="text-left md:text-right">
-                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Principal</div>
-                            <div className="text-sm md:text-base text-slate-600 dark:text-shark-300 font-mono font-medium">{formatCurrency(loan.principal)}</div>
+                        {/* Middle Row: Compounding Cycle Countdown & Repayment Progress */}
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-100 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {calc.riskCategory === 'GRACE_PERIOD' && (
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Cycle 1 (Grace Period) • {calc.daysUntilNextCycle} days until Cycle 2 (+{activeMonthlyRate}%)</span>
+                              </span>
+                            )}
+                            {calc.riskCategory === 'COMPOUNDING_1' && (
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                <span>Cycle 2 Active • Compounding (+{activeMonthlyRate}%) • {calc.daysUntilNextCycle} days until Cycle 3</span>
+                              </span>
+                            )}
+                            {calc.riskCategory === 'OVERDUE_HIGH_RISK' && (
+                              <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                <span>Cycle {calc.monthsElapsed} (High Risk) • {calc.daysUntilNextCycle} days until next compounding</span>
+                              </span>
+                            )}
                           </div>
-                          <div className="text-left md:text-right">
-                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Interest</div>
-                            <div className="text-sm md:text-base text-money-600 dark:text-money-500 font-mono font-bold">+{formatCurrency(calc.interestAccrued)}</div>
+
+                          {calc.totalRepaid > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentModalLoan(loan)}
+                              className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>✓ Paid {formatCurrency(calc.totalRepaid)}</span>
+                              <span className="text-slate-400 dark:text-shark-500 font-normal">
+                                ({calc.repaymentCount} {calc.repaymentCount === 1 ? 'payment' : 'payments'})
+                              </span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 dark:text-shark-500 text-[11px]">
+                              No payments logged yet
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom Row: Financial Figures */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full pt-3 border-t border-slate-100 dark:border-shark-700">
+                          <div>
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Principal</div>
+                            <div className="text-sm font-mono text-slate-700 dark:text-shark-300 font-medium">{formatCurrency(loan.principal)}</div>
                           </div>
-                          <div className="text-right border-l border-slate-100 dark:border-shark-800 pl-4 md:pl-6 md:border-l-2">
-                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Total Due</div>
-                            <div className="text-base md:text-xl font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(calc.totalAmount)}</div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Accrued Interest</div>
+                            <div className="text-sm font-mono text-money-600 dark:text-money-500 font-bold">+{formatCurrency(calc.interestAccrued)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Total Repaid</div>
+                            <div className="text-sm font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(calc.totalRepaid)}</div>
+                          </div>
+                          <div className="border-l border-slate-100 dark:border-shark-700 pl-3">
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-bold">Remaining Balance</div>
+                            <div className="text-base font-mono font-bold text-amber-600 dark:text-amber-400">{formatCurrency(calc.remainingBalance)}</div>
                           </div>
                         </div>
                       </div>
                     );
                   })}
                   {filteredActiveLoans.length === 0 && (
-                    <div className="text-center py-12 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-800/50 rounded-xl border border-slate-200 dark:border-shark-700 border-dashed">
-                      {searchTerm ? 'No loans matching your search.' : 'No active loans found.'}
+                    <div className="text-center py-12 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-800/50 rounded-2xl border border-slate-200 dark:border-shark-700 border-dashed">
+                      <div className="text-3xl mb-2">🔍</div>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-shark-300">
+                        {searchTerm ? 'No loans matching your search.' : 'No active loans in this category.'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -3112,9 +3384,9 @@ export default function App() {
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-6">Closed & History Records</h2>
                 <div className="grid gap-4">
                   {loans.filter(l => l.status !== 'ACTIVE').map((loan) => {
-                    const calc = calculateLoanDetails(loan, settings.globalInitialInterestRate, settings.globalInterestRate);
+                    const calc = calculateLoanDetails(loan, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
                     return (
-                      <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 flex flex-col gap-4 opacity-75 shadow-sm hover:opacity-100 transition-all duration-300">
+                      <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 flex flex-col gap-4 opacity-85 shadow-sm hover:opacity-100 transition-all duration-300">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3.5 min-w-0">
                             <CustomerAvatar
@@ -3168,36 +3440,48 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="flex gap-1 md:gap-2 shrink-0">
+                          <div className="flex items-center gap-1 md:gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentModalLoan(loan)}
+                              title="View Payment Ledger"
+                              className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/20 transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>💰 Payments ({calc.repaymentCount})</span>
+                            </button>
                             <button 
                               onClick={() => changeLoanStatus(loan.id, 'ACTIVE')} 
                               title="Re-activate Loan"
-                              className="p-1.5 text-money-600 dark:text-money-400 hover:bg-money-100/50 dark:hover:bg-money-950/30 rounded-lg transition-colors"
+                              className="p-1.5 text-money-600 dark:text-money-400 hover:bg-money-100/50 dark:hover:bg-money-950/30 rounded-lg transition-colors cursor-pointer"
                             >
                               <Icons.Refresh />
                             </button>
                             <button 
                               onClick={() => deleteLoan(loan.id)} 
                               title="Delete Record"
-                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
                             >
                               <Icons.Trash />
                             </button>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 w-full pt-3 border-t border-slate-100 dark:border-shark-800/80 md:border-t-0 md:pt-0 md:flex md:items-center md:justify-end md:gap-8 md:w-auto ml-auto">
-                          <div className="text-left md:text-right">
-                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Principal</div>
-                            <div className="text-sm md:text-base text-slate-600 dark:text-shark-300 font-mono font-medium">{formatCurrency(loan.principal)}</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full pt-3 border-t border-slate-100 dark:border-shark-800/80">
+                          <div>
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider">Principal</div>
+                            <div className="text-sm text-slate-600 dark:text-shark-300 font-mono font-medium">{formatCurrency(loan.principal)}</div>
                           </div>
-                          <div className="text-left md:text-right">
-                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Interest</div>
-                            <div className="text-sm md:text-base text-slate-600 dark:text-shark-300 font-mono">{formatCurrency(calc.interestAccrued)}</div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider">Interest</div>
+                            <div className="text-sm text-slate-600 dark:text-shark-300 font-mono">{formatCurrency(calc.interestAccrued)}</div>
                           </div>
-                          <div className="text-right border-l border-slate-100 dark:border-shark-800 pl-4 md:pl-6 md:border-l-2">
-                            <div className="text-[10px] md:text-xs text-slate-400 dark:text-shark-500 uppercase tracking-wider">Total Due</div>
-                            <div className="text-base md:text-xl font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(calc.totalAmount)}</div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider">Total Repaid</div>
+                            <div className="text-sm text-emerald-600 dark:text-emerald-400 font-mono font-bold">{formatCurrency(calc.totalRepaid)}</div>
+                          </div>
+                          <div className="border-l border-slate-100 dark:border-shark-800 pl-3">
+                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider">Gross Debt</div>
+                            <div className="text-sm font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(calc.totalAmount)}</div>
                           </div>
                         </div>
                       </div>
@@ -4624,6 +4908,27 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* LOAN INSTALLMENT LEDGER MODAL */}
+      <PaymentModal
+        isOpen={Boolean(paymentModalLoan)}
+        onClose={() => setPaymentModalLoan(null)}
+        loan={paymentModalLoan}
+        customer={paymentModalLoan ? getCustomer(paymentModalLoan.customerId) || null : null}
+        calculations={
+          paymentModalLoan
+            ? calculateLoanDetails(
+                paymentModalLoan,
+                settings.globalInitialInterestRate,
+                settings.globalInterestRate,
+                repayments
+              )
+            : null
+        }
+        repayments={repayments}
+        onRecordPayment={handleRecordPayment}
+        onDeletePayment={handleDeletePayment}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { api } from '../convex/_generated/api';
 import { convex } from './convexClient';
-import { AppSettings, Customer, Loan } from '../types';
+import { AppSettings, Customer, Loan, PaymentMethod, Repayment } from '../types';
 
 export const getBootstrap = async () => {
   return convex.query(api.bootstrap.get);
@@ -47,6 +47,30 @@ export const deleteLoan = async (id: string) => {
 
 export const updateLoanStatus = async (id: string, status: Loan['status']) => {
   return convex.mutation(api.loans.updateStatus, { id: id as any, status });
+};
+
+export const recordPayment = async (payload: {
+  loanId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  notes?: string;
+}) => {
+  return (await convex.mutation(api.repayments.recordPayment, {
+    loanId: payload.loanId as any,
+    amount: payload.amount,
+    paymentDate: payload.paymentDate,
+    paymentMethod: payload.paymentMethod,
+    notes: payload.notes,
+  })) as Repayment & { isFullyPaid: boolean; totalRepaid: number; grossDebt: number };
+};
+
+export const deletePayment = async (id: string) => {
+  return convex.mutation(api.repayments.deletePayment, { id: id as any });
+};
+
+export const listLoanPayments = async (loanId: string) => {
+  return convex.query(api.repayments.listByLoan, { loanId: loanId as any });
 };
 
 export const listTrash = async () => {

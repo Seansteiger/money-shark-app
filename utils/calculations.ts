@@ -1,17 +1,38 @@
-import { Loan, InterestType } from '../types';
+import { Loan, InterestType, Repayment } from '../types';
+
+export interface LoanCalculations {
+  totalAmount: number; // Gross amount owed (principal + initial markup + compound interest)
+  interestAccrued: number; // Total interest accumulated
+  monthsElapsed: number; // Compounded cycles completed
+  effectiveInitialRate: number;
+  effectiveMonthlyRate: number;
+  // Repayments breakdown
+  totalRepaid: number;
+  remainingBalance: number;
+  repaymentProgress: number; // 0 to 100%
+  repaymentCount: number;
+  isFullyPaid: boolean;
+  // 30-Day Cycle Countdown & Urgency
+  daysElapsed: number;
+  daysInCurrentCycle: number;
+  daysUntilNextCycle: number;
+  nextCompoundDate: string; // ISO date or formatted
+  riskCategory: 'GRACE_PERIOD' | 'COMPOUNDING_1' | 'OVERDUE_HIGH_RISK';
+}
 
 export const calculateLoanDetails = (
   loan: Loan, 
   globalInitialRate: number, 
-  globalMonthlyRate: number
-) => {
+  globalMonthlyRate: number,
+  allRepayments: Repayment[] = []
+): LoanCalculations => {
   const start = new Date(loan.startDate);
   start.setHours(0, 0, 0, 0);
   
   const now = new Date();
   
   const diffInMs = now.getTime() - start.getTime();
-  const daysElapsed = Math.max(0, diffInMs / (1000 * 60 * 60 * 24));
+  const daysElapsed = Math.max(0, Math.floor(diffInMs / (1000 * 60 * 60 * 24)));
   
   // Determine rates to use (specific or global)
   const initialRate = loan.isFixedRate ? globalInitialRate : loan.initialInterestRate;
@@ -20,41 +41,65 @@ export const calculateLoanDetails = (
   const principal = loan.principal;
 
   // Step 1: Calculate the "Base Debt" immediately upon taking the loan
-  // "Automatically becomes 750 from the point they borrow" (if 500 principal + 50% initial)
   const initialInterestAmount = principal * (initialRate / 100);
   const baseDebt = principal + initialInterestAmount;
 
-  let totalAmount = 0;
   const CYCLE_DAYS = 30;
+  const cycles = Math.floor(daysElapsed / CYCLE_DAYS);
+  const daysInCurrentCycle = daysElapsed % CYCLE_DAYS;
+  const daysUntilNextCycle = CYCLE_DAYS - daysInCurrentCycle;
+
+  // Next compound date
+  const nextCompoundTimestamp = start.getTime() + ((cycles + 1) * CYCLE_DAYS * 24 * 60 * 60 * 1000);
+  const nextCompoundDate = new Date(nextCompoundTimestamp).toISOString().split('T')[0];
+
+  let totalAmount = 0;
 
   // Step 2: Determine compounding cycles
-  // "Total owed remains the same until 30 days pass. That's when it starts compounding."
-  const cycles = Math.floor(daysElapsed / CYCLE_DAYS);
-
   if (cycles <= 0) {
-    // First 30 days (Day 0 to Day 29)
     totalAmount = baseDebt;
   } else {
-    // After 30 days
     if (loan.interestType === InterestType.SIMPLE) {
-      // Simple Interest on the Base Debt
-      // Total = Base * (1 + (monthlyRate * cycles))
       totalAmount = baseDebt * (1 + ((monthlyRate / 100) * cycles));
     } else {
-      // Compound Monthly on the Base Debt
-      // Total = Base * (1 + monthlyRate)^cycles
       totalAmount = baseDebt * Math.pow(1 + (monthlyRate / 100), cycles);
     }
   }
 
-  const interestAccrued = totalAmount - principal;
+  const interestAccrued = Math.max(0, totalAmount - principal);
+
+  // Filter repayments for this specific loan
+  const loanRepayments = allRepayments.filter(r => r.loanId === loan.id);
+  const totalRepaid = loanRepayments.reduce((sum, r) => sum + r.amount, 0);
+  const remainingBalance = Math.max(0, Math.round((totalAmount - totalRepaid) * 100) / 100);
+  const isFullyPaid = remainingBalance <= 0.01 && (totalRepaid > 0 || loan.status === 'PAID');
+  const repaymentProgress = totalAmount > 0 
+    ? Math.min(100, Math.max(0, Math.round((totalRepaid / totalAmount) * 100))) 
+    : 0;
+
+  let riskCategory: 'GRACE_PERIOD' | 'COMPOUNDING_1' | 'OVERDUE_HIGH_RISK' = 'GRACE_PERIOD';
+  if (cycles === 1) {
+    riskCategory = 'COMPOUNDING_1';
+  } else if (cycles >= 2) {
+    riskCategory = 'OVERDUE_HIGH_RISK';
+  }
 
   return {
     totalAmount,
     interestAccrued,
     monthsElapsed: cycles,
     effectiveInitialRate: initialRate,
-    effectiveMonthlyRate: monthlyRate
+    effectiveMonthlyRate: monthlyRate,
+    totalRepaid,
+    remainingBalance,
+    repaymentProgress,
+    repaymentCount: loanRepayments.length,
+    isFullyPaid,
+    daysElapsed,
+    daysInCurrentCycle,
+    daysUntilNextCycle,
+    nextCompoundDate,
+    riskCategory,
   };
 };
 

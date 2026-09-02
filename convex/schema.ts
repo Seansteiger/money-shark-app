@@ -40,6 +40,20 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
   }).index("by_userId", ["userId"]),
 
+  repayments: defineTable({
+    userId: v.id("users"),
+    loanId: v.id("loans"),
+    customerId: v.id("customers"),
+    amount: v.number(),
+    paymentDate: v.string(), // ISO Date YYYY-MM-DD
+    paymentMethod: v.union(v.literal("CASH"), v.literal("BANK_TRANSFER"), v.literal("CARD"), v.literal("OTHER")),
+    notes: v.optional(v.string()),
+    isDeleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_loanId", ["loanId"]),
+
   passkeys: defineTable({
     userId: v.id("users"),
     credentialId: v.string(),
