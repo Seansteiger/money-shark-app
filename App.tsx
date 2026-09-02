@@ -2276,9 +2276,6 @@ export default function App() {
                 <Icons.Camera />
                 <span>Customer Profile Photo</span>
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-shark-400 bg-shark-800 px-2.5 py-1 rounded-full border border-shark-700">
-                ⚡ Direct Capture • Zero AI
-              </span>
             </div>
 
             {/* Viewfinder Video Stream */}
@@ -2547,7 +2544,7 @@ export default function App() {
                   <ul className="space-y-2 list-none">
                     <li className="flex items-start gap-2">
                       <span className="text-money-400 font-bold">•</span>
-                      <span><strong className="text-white">Portrait Camera:</strong> Snap client faces or upload existing pictures directly (100% on-device, zero AI cost).</span>
+                      <span><strong className="text-white">Portrait Camera:</strong> Take client photos using your device camera or choose pictures from your gallery.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-money-400 font-bold">•</span>
@@ -2795,9 +2792,6 @@ export default function App() {
                   </button>
                 )}
               </div>
-              <span className="text-[10px] text-slate-400 dark:text-shark-500 mt-2">
-                ⚡ Direct upload • Zero AI token usage
-              </span>
             </div>
 
             {customerModalError && (
@@ -3613,7 +3607,7 @@ export default function App() {
 
                       <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex items-center gap-3 text-xs text-slate-500 dark:text-shark-400">
                         <span className="text-money-500 text-base"><Icons.Sparkles /></span>
-                        <span>Powered by <strong>Google Gemini 2.5 Flash</strong> OCR engine for high-accuracy handwriting and paper ledger recognition.</span>
+                        <span>High-accuracy document scanner for recognizing handwriting, paper notes, and receipts.</span>
                       </div>
                     </div>
                   )}
@@ -3658,7 +3652,6 @@ export default function App() {
                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-4">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-slate-500 dark:text-shark-500 uppercase">Customer Profile & Photo</label>
-                        <span className="text-[10px] text-money-600 dark:text-money-400 bg-money-500/10 px-2 py-0.5 rounded-full font-medium">⚡ Direct Capture • Zero AI</span>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
