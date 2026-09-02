@@ -73,6 +73,9 @@ const Icons = {
   Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
   Phone: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
   Image: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>,
+  Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+  Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  ZoomIn: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
 };
 
 // Helper: Extract uppercase initials from customer name
@@ -147,12 +150,13 @@ interface CustomerAvatarProps {
   customer?: { name?: string; avatar?: string; address?: string };
   name?: string;
   avatar?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   className?: string;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
+  showHoverZoom?: boolean;
 }
 
-function CustomerAvatar({ customer, name, avatar, size = 'md', className = '', onClick }: CustomerAvatarProps) {
+function CustomerAvatar({ customer, name, avatar, size = 'md', className = '', onClick, showHoverZoom = false }: CustomerAvatarProps) {
   const sizeClasses = {
     xs: 'w-6 h-6 text-[10px]',
     sm: 'w-8 h-8 text-xs',
@@ -160,27 +164,40 @@ function CustomerAvatar({ customer, name, avatar, size = 'md', className = '', o
     lg: 'w-12 h-12 text-base',
     xl: 'w-16 h-16 text-xl',
     '2xl': 'w-24 h-24 text-3xl',
+    '3xl': 'w-32 h-32 text-4xl',
   }[size];
 
   const displayName = name || customer?.name || 'Customer';
   const displayAvatar = avatar !== undefined ? avatar : customer?.avatar;
   const initials = getCustomerInitials(displayName);
   const gradient = getAvatarGradient(displayName);
+  const hasImage = Boolean(displayAvatar && displayAvatar.trim() !== '');
 
-  if (displayAvatar && displayAvatar.trim() !== '') {
+  if (hasImage) {
     return (
-      <img
-        src={displayAvatar}
-        alt={displayName}
+      <div
         onClick={onClick}
-        className={`${sizeClasses} rounded-full object-cover border-2 border-money-500/40 shadow-sm shrink-0 ${onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''} ${className}`}
-      />
+        title={onClick ? `View ${displayName}'s profile picture` : displayName}
+        className={`relative group/avatar inline-block shrink-0 rounded-full overflow-hidden ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      >
+        <img
+          src={displayAvatar}
+          alt={displayName}
+          className={`${sizeClasses} rounded-full object-cover border-2 border-money-500/40 shadow-sm transition-transform duration-200 group-hover/avatar:scale-105`}
+        />
+        {showHoverZoom && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center rounded-full text-white backdrop-blur-[1px]">
+            <Icons.Eye />
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
     <div
       onClick={onClick}
+      title={onClick ? `View ${displayName}'s profile` : displayName}
       className={`${sizeClasses} rounded-full bg-gradient-to-br ${gradient} text-white font-bold flex items-center justify-center shadow-sm shrink-0 select-none border border-white/20 ${onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''} ${className}`}
     >
       {initials}
@@ -283,6 +300,15 @@ export default function App() {
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [customerModalError, setCustomerModalError] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+
+  // Customer Profile Photo Lightbox Viewer State
+  const [viewingPhotoCustomer, setViewingPhotoCustomer] = useState<{
+    name: string;
+    avatar: string;
+    address?: string;
+    phone?: string;
+    id?: string;
+  } | null>(null);
 
   const [isDeviceBiometricAvailable, setIsDeviceBiometricAvailable] = useState(false);
   const [isAppShieldLocked, setIsAppShieldLocked] = useState(() => {
@@ -2130,6 +2156,110 @@ export default function App() {
         </div>
       )}
 
+      {/* FULL-SIZE CUSTOMER PROFILE PICTURE LIGHTBOX MODAL */}
+      {viewingPhotoCustomer && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="absolute inset-0"
+            onClick={() => setViewingPhotoCustomer(null)}
+          ></div>
+
+          <div className="relative z-10 max-w-md md:max-w-lg w-full bg-shark-950 rounded-3xl border border-shark-700/80 shadow-2xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-4 px-6 flex items-center justify-between border-b border-shark-800 bg-shark-900/60">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-money-500/10 text-money-400 rounded-xl shrink-0">
+                  <Icons.User />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-white truncate">
+                    {viewingPhotoCustomer.name}
+                  </h3>
+                  {viewingPhotoCustomer.address ? (
+                    <p className="text-xs text-shark-400 flex items-center gap-1 truncate" title={viewingPhotoCustomer.address}>
+                      <Icons.MapPin />
+                      <span className="truncate">{viewingPhotoCustomer.address}</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-shark-500">Customer Profile Picture</p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingPhotoCustomer(null)}
+                className="p-2 text-shark-400 hover:text-white rounded-xl hover:bg-shark-800 transition-colors"
+                title="Close photo viewer"
+              >
+                <Icons.X />
+              </button>
+            </div>
+
+            {/* Photo Container */}
+            <div className="relative p-6 flex flex-col items-center justify-center bg-black/50">
+              {viewingPhotoCustomer.avatar && viewingPhotoCustomer.avatar.trim() !== '' ? (
+                <div className="relative max-h-[58vh] max-w-full flex items-center justify-center rounded-2xl overflow-hidden border-2 border-money-500/40 shadow-2xl bg-shark-950">
+                  <img
+                    src={viewingPhotoCustomer.avatar}
+                    alt={viewingPhotoCustomer.name}
+                    className="max-h-[52vh] w-auto max-w-full object-contain rounded-2xl"
+                  />
+                </div>
+              ) : (
+                <div className="py-12 flex flex-col items-center justify-center space-y-4">
+                  <CustomerAvatar
+                    name={viewingPhotoCustomer.name}
+                    size="3xl"
+                    className="ring-8 ring-money-500/20"
+                  />
+                  <p className="text-xs text-shark-400 text-center max-w-xs">
+                    No photograph attached for {viewingPhotoCustomer.name}.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div className="p-4 px-6 bg-shark-900/80 border-t border-shark-800 flex items-center justify-between gap-3">
+              {viewingPhotoCustomer.avatar && viewingPhotoCustomer.avatar.trim() !== '' && (
+                <a
+                  href={viewingPhotoCustomer.avatar}
+                  download={`${viewingPhotoCustomer.name.replace(/\s+/g, '_')}_profile.jpg`}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-shark-800 hover:bg-shark-700 text-white text-xs font-semibold rounded-xl border border-shark-700 transition-colors shadow-sm"
+                >
+                  <Icons.Download />
+                  <span>Download</span>
+                </a>
+              )}
+
+              {viewingPhotoCustomer.id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = getCustomer(viewingPhotoCustomer.id!);
+                    setViewingPhotoCustomer(null);
+                    if (c) handleOpenEditCustomerModal(c);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-money-600/20 hover:bg-money-600/30 text-money-400 text-xs font-semibold rounded-xl border border-money-500/30 transition-colors ml-auto"
+                >
+                  <Icons.Edit />
+                  <span>Edit Profile</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setViewingPhotoCustomer(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-colors ml-auto"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CUSTOMER PROFILE MODAL (CREATE / EDIT CUSTOMER) */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2165,13 +2295,25 @@ export default function App() {
                   name={editingCustomer.name}
                   avatar={editingCustomer.avatar}
                   size="2xl"
+                  showHoverZoom={Boolean(editingCustomer.avatar)}
+                  onClick={() => {
+                    if (editingCustomer.avatar) {
+                      setViewingPhotoCustomer({
+                        name: editingCustomer.name || 'Customer',
+                        avatar: editingCustomer.avatar,
+                        address: editingCustomer.address,
+                        phone: editingCustomer.phone,
+                        id: editingCustomer.id,
+                      });
+                    }
+                  }}
                   className="ring-4 ring-money-500/30"
                 />
                 {editingCustomer.avatar && (
                   <button
                     type="button"
                     onClick={() => setEditingCustomer(prev => ({ ...prev, avatar: '' }))}
-                    className="absolute -top-1 -right-1 p-1.5 bg-red-600 text-white rounded-full hover:bg-red-500 shadow-md transition-transform active:scale-95"
+                    className="absolute -top-1 -right-1 p-1.5 bg-red-600 text-white rounded-full hover:bg-red-500 shadow-md transition-transform active:scale-95 z-10"
                     title="Remove Photo"
                   >
                     <Icons.X />
@@ -2196,6 +2338,22 @@ export default function App() {
                   <Icons.Upload />
                   <span>Choose Image</span>
                 </button>
+                {editingCustomer.avatar && (
+                  <button
+                    type="button"
+                    onClick={() => setViewingPhotoCustomer({
+                      name: editingCustomer.name || 'Customer',
+                      avatar: editingCustomer.avatar,
+                      address: editingCustomer.address,
+                      phone: editingCustomer.phone,
+                      id: editingCustomer.id,
+                    })}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-money-500/10 hover:bg-money-500/20 text-money-600 dark:text-money-400 text-xs font-semibold rounded-xl border border-money-500/30 transition-all active:scale-95"
+                  >
+                    <Icons.Eye />
+                    <span>View Photo</span>
+                  </button>
+                )}
               </div>
               <span className="text-[10px] text-slate-400 dark:text-shark-500 mt-2">
                 ⚡ Direct upload • Zero AI token usage
@@ -2363,9 +2521,20 @@ export default function App() {
                             <CustomerAvatar
                               customer={getCustomer(loan.customerId)}
                               size="md"
+                              showHoverZoom={Boolean(getCustomer(loan.customerId)?.avatar)}
                               onClick={() => {
                                 const c = getCustomer(loan.customerId);
-                                if (c) handleOpenEditCustomerModal(c);
+                                if (c?.avatar) {
+                                  setViewingPhotoCustomer({
+                                    name: c.name,
+                                    avatar: c.avatar,
+                                    address: c.address,
+                                    phone: c.phone,
+                                    id: c.id,
+                                  });
+                                } else if (c) {
+                                  handleOpenEditCustomerModal(c);
+                                }
                               }}
                             />
                             <div className="min-w-0">
@@ -2459,9 +2628,20 @@ export default function App() {
                             <CustomerAvatar
                               customer={getCustomer(loan.customerId)}
                               size="md"
+                              showHoverZoom={Boolean(getCustomer(loan.customerId)?.avatar)}
                               onClick={() => {
                                 const c = getCustomer(loan.customerId);
-                                if (c) handleOpenEditCustomerModal(c);
+                                if (c?.avatar) {
+                                  setViewingPhotoCustomer({
+                                    name: c.name,
+                                    avatar: c.avatar,
+                                    address: c.address,
+                                    phone: c.phone,
+                                    id: c.id,
+                                  });
+                                } else if (c) {
+                                  handleOpenEditCustomerModal(c);
+                                }
                               }}
                             />
                             <div className="min-w-0">
@@ -2593,13 +2773,42 @@ export default function App() {
                           <CustomerAvatar
                             customer={c}
                             size="xl"
-                            onClick={() => handleOpenEditCustomerModal(c)}
+                            showHoverZoom={Boolean(c.avatar)}
+                            onClick={() => {
+                              if (c.avatar) {
+                                setViewingPhotoCustomer({
+                                  name: c.name,
+                                  avatar: c.avatar,
+                                  address: c.address,
+                                  phone: c.phone,
+                                  id: c.id,
+                                });
+                              } else {
+                                handleOpenEditCustomerModal(c);
+                              }
+                            }}
                           />
+                          {c.avatar ? (
+                            <button
+                              type="button"
+                              onClick={() => setViewingPhotoCustomer({
+                                name: c.name,
+                                avatar: c.avatar,
+                                address: c.address,
+                                phone: c.phone,
+                                id: c.id,
+                              })}
+                              className="absolute -bottom-1 -left-1 p-1 bg-white dark:bg-shark-700 rounded-full border border-slate-200 dark:border-shark-600 text-slate-600 dark:text-slate-300 hover:text-money-500 shadow-sm transition-transform active:scale-95 z-10"
+                              title="View full profile photo"
+                            >
+                              <Icons.Eye />
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => handleOpenEditCustomerModal(c)}
-                            className="absolute -bottom-1 -right-1 p-1 bg-white dark:bg-shark-700 rounded-full border border-slate-200 dark:border-shark-600 text-slate-600 dark:text-slate-300 hover:text-money-500 shadow-sm transition-transform active:scale-95"
-                            title="Edit photo"
+                            className="absolute -bottom-1 -right-1 p-1 bg-white dark:bg-shark-700 rounded-full border border-slate-200 dark:border-shark-600 text-slate-600 dark:text-slate-300 hover:text-money-500 shadow-sm transition-transform active:scale-95 z-10"
+                            title={c.avatar ? "Change photo" : "Add photo"}
                           >
                             <Icons.Camera />
                           </button>
@@ -2671,6 +2880,22 @@ export default function App() {
                         </button>
 
                         <div className="flex items-center gap-1">
+                          {c.avatar && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingPhotoCustomer({
+                                name: c.name,
+                                avatar: c.avatar,
+                                address: c.address,
+                                phone: c.phone,
+                                id: c.id,
+                              })}
+                              title="View Customer Photo"
+                              className="p-1.5 text-money-600 dark:text-money-400 hover:bg-money-50 dark:hover:bg-money-950/30 rounded-lg transition-colors"
+                            >
+                              <Icons.Eye />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleOpenEditCustomerModal(c)}
@@ -2945,9 +3170,20 @@ export default function App() {
                             name={formData.customerName}
                             avatar={formData.customerAvatar}
                             size="xl"
+                            showHoverZoom={Boolean(formData.customerAvatar)}
+                            onClick={() => {
+                              if (formData.customerAvatar) {
+                                setViewingPhotoCustomer({
+                                  name: formData.customerName || 'Customer',
+                                  avatar: formData.customerAvatar,
+                                  address: formData.customerAddress,
+                                  phone: formData.customerPhone,
+                                });
+                              }
+                            }}
                           />
                           <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => startCamera('user', 'customer_avatar_form')}
@@ -2965,14 +3201,29 @@ export default function App() {
                                 <span>Choose Image</span>
                               </button>
                               {formData.customerAvatar && (
-                                <button
-                                  type="button"
-                                  onClick={() => setFormData(prev => ({ ...prev, customerAvatar: '' }))}
-                                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-xs"
-                                  title="Remove Photo"
-                                >
-                                  <Icons.X />
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingPhotoCustomer({
+                                      name: formData.customerName || 'Customer',
+                                      avatar: formData.customerAvatar,
+                                      address: formData.customerAddress,
+                                      phone: formData.customerPhone,
+                                    })}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-money-500/10 hover:bg-money-500/20 text-money-600 dark:text-money-400 text-xs font-semibold rounded-lg border border-money-500/30 transition-all active:scale-95"
+                                  >
+                                    <Icons.Eye />
+                                    <span>View Photo</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, customerAvatar: '' }))}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-xs"
+                                    title="Remove Photo"
+                                  >
+                                    <Icons.X />
+                                  </button>
+                                </>
                               )}
                             </div>
                             <span className="text-[10px] text-slate-400 dark:text-shark-500">
