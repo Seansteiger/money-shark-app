@@ -3428,7 +3428,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => handleSelectExistingCustomerForLoan(group.customerId)}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-shark-900 dark:hover:bg-shark-700 text-slate-700 dark:text-shark-200 rounded-xl text-xs font-bold border border-slate-200 dark:border-shark-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-900 text-white rounded-xl text-xs font-bold border border-emerald-700/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
                               title="Add another loan under this customer's profile"
                             >
                               <Icons.Plus />
@@ -3915,7 +3915,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => handleSelectExistingCustomerForLoan(c.id)}
-                          className="flex items-center gap-1.5 text-xs font-bold text-money-600 dark:text-money-400 hover:text-money-700 dark:hover:text-money-300 py-1 cursor-pointer"
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-900 text-white rounded-xl border border-emerald-700/60 shadow-sm transition-all cursor-pointer active:scale-95"
                         >
                           <Icons.Plus /> <span>Add Loan on Profile</span>
                         </button>
