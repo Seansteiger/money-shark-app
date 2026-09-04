@@ -35,6 +35,7 @@ import {
 import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
 import { PaymentModal } from './components/PaymentModal';
 import { PortfolioAnalytics } from './components/PortfolioAnalytics';
+import { DuplicateCustomerModal } from './components/DuplicateCustomerModal';
 import { exportPortfolioToCsv } from './utils/exportCsv';
 
 
@@ -466,6 +467,17 @@ export default function App() {
     isFixedRate: true,
     notes: ''
   });
+
+  // Customer selection mode for new loan entry: 'existing' profile vs 'new' profile
+  const [entryCustomerMode, setEntryCustomerMode] = useState<'existing' | 'new'>('new');
+  const [selectedExistingCustomerId, setSelectedExistingCustomerId] = useState<string | null>(null);
+  const [customerPickerSearch, setCustomerPickerSearch] = useState('');
+
+  // Duplicate profile detection prompt modal
+  const [duplicateCustomerPrompt, setDuplicateCustomerPrompt] = useState<{
+    matchingCustomer: Customer;
+    loanPayload: any;
+  } | null>(null);
 
   // Scanner & Live Camera State
   // Camera Purpose: 'ocr_scan' (invokes Gemini AI) vs 'customer_avatar_form' | 'customer_avatar_modal' (Zero AI)
@@ -958,6 +970,36 @@ export default function App() {
   // --- Customer & Loan Helpers ---
   const getCustomer = (id: string): Customer | undefined => customers.find(c => c.id === id);
   const getCustomerName = (id: string) => getCustomer(id)?.name || 'Unknown';
+
+  const handleSelectExistingCustomerForLoan = (customerId: string) => {
+    const cust = customers.find((c) => c.id === customerId);
+    if (!cust) return;
+    setSelectedExistingCustomerId(cust.id);
+    setEntryCustomerMode('existing');
+    setFormData((prev) => ({
+      ...prev,
+      customerName: cust.name,
+      customerAddress: cust.address || '',
+      customerAvatar: cust.avatar || '',
+      customerPhone: cust.phone || '',
+      principal: '',
+      startDate: new Date().toISOString().split('T')[0],
+      notes: '',
+    }));
+    setView('entry');
+    setEntryMode('manual');
+  };
+
+  const handleClearSelectedCustomerForLoan = () => {
+    setSelectedExistingCustomerId(null);
+    setFormData((prev) => ({
+      ...prev,
+      customerName: '',
+      customerAddress: '',
+      customerAvatar: '',
+      customerPhone: '',
+    }));
+  };
 
   const handleCustomerNameChange = (name: string) => {
     const existing = customers.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
@@ -1525,42 +1567,67 @@ export default function App() {
     }
   };
 
-  const handleSaveLoan = async () => {
+  const handleSaveLoan = async (options?: { customerId?: string; forceNewCustomer?: boolean } | React.MouseEvent) => {
+    const opts = options && !('nativeEvent' in options) ? (options as { customerId?: string; forceNewCustomer?: boolean }) : undefined;
     if (!formData.customerName || !formData.principal) {
       alert("Please fill in Customer Name and Amount.");
       return;
     }
 
+    // If options not explicitly provided and user is in 'new' profile mode, check if a matching customer profile already exists
+    if (!opts && entryCustomerMode === 'new') {
+      const trimmedName = formData.customerName.trim().toLowerCase();
+      const trimmedPhone = formData.customerPhone ? formData.customerPhone.trim() : '';
+      const existingMatch = customers.find(c =>
+        c.name.trim().toLowerCase() === trimmedName ||
+        (trimmedPhone && c.phone && c.phone.trim() === trimmedPhone)
+      );
+
+      if (existingMatch) {
+        // Intercept and ask the user if they want to put this loan under the existing profile or create a separate profile!
+        const payload = {
+          customerName: formData.customerName,
+          customerAddress: formData.customerAddress,
+          customerAvatar: formData.customerAvatar,
+          customerPhone: formData.customerPhone,
+          principal: parseFloat(formData.principal),
+          initialInterestRate: parseFloat(formData.isFixedRate ? settings.globalInitialInterestRate : formData.initialInterestRate),
+          interestRate: parseFloat(formData.isFixedRate ? settings.globalInterestRate : formData.interestRate),
+          startDate: formData.startDate,
+          interestType: formData.interestType,
+          isFixedRate: formData.isFixedRate,
+          notes: formData.notes + (scanClarification ? ` [AI Note: ${scanClarification}]` : '')
+        };
+        setDuplicateCustomerPrompt({
+          matchingCustomer: existingMatch,
+          loanPayload: payload,
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
+      const targetCustomerId = opts?.customerId || (entryCustomerMode === 'existing' ? selectedExistingCustomerId : undefined);
+      const isForceNew = opts?.forceNewCustomer || false;
+
       const loanPayload = {
+        customerId: targetCustomerId || undefined,
+        forceNewCustomer: isForceNew,
         customerName: formData.customerName,
         customerAddress: formData.customerAddress,
         customerAvatar: formData.customerAvatar,
         customerPhone: formData.customerPhone,
         principal: parseFloat(formData.principal),
-        initial_interest_rate: parseFloat(formData.initialInterestRate),
-        interest_rate: parseFloat(formData.interestRate),
-        start_date: formData.startDate,
-        interest_type: formData.interestType,
-        is_fixed_rate: formData.isFixedRate,
-        status: 'ACTIVE',
+        initialInterestRate: parseFloat(formData.isFixedRate ? settings.globalInitialInterestRate : formData.initialInterestRate),
+        interestRate: parseFloat(formData.isFixedRate ? settings.globalInterestRate : formData.interestRate),
+        startDate: formData.startDate,
+        interestType: formData.interestType,
+        isFixedRate: formData.isFixedRate,
         notes: formData.notes + (scanClarification ? ` [AI Note: ${scanClarification}]` : '')
       };
 
-      const { customer, loan } = await createLoan({
-        customerName: loanPayload.customerName,
-        customerAddress: loanPayload.customerAddress,
-        customerAvatar: loanPayload.customerAvatar,
-        customerPhone: loanPayload.customerPhone,
-        principal: loanPayload.principal,
-        initialInterestRate: loanPayload.initial_interest_rate,
-        interestRate: loanPayload.interest_rate,
-        startDate: loanPayload.start_date,
-        interestType: loanPayload.interest_type,
-        isFixedRate: loanPayload.is_fixed_rate,
-        notes: loanPayload.notes,
-      });
+      const { customer, loan } = await createLoan(loanPayload);
 
       setCustomers(prev => {
         const idx = prev.findIndex(c => c.id === customer.id);
@@ -1574,7 +1641,10 @@ export default function App() {
 
       setLoans(prev => [loan, ...prev]);
 
-      // Reset Form
+      // Reset Form & Selection
+      setSelectedExistingCustomerId(null);
+      setEntryCustomerMode('new');
+      setDuplicateCustomerPrompt(null);
       setFormData({
         customerName: '',
         customerAddress: '',
@@ -3248,6 +3318,20 @@ export default function App() {
                                 >
                                   {getCustomerName(loan.customerId)}
                                 </button>
+                                {activeLoans.filter(l => l.customerId === loan.customerId).length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCustomerSearchTerm(getCustomerName(loan.customerId));
+                                      setView('loans');
+                                    }}
+                                    className="text-[10px] md:text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-md border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-pointer"
+                                    title="View all separate loans under this customer profile"
+                                  >
+                                    <span>👥</span>
+                                    <span>{activeLoans.filter(l => l.customerId === loan.customerId).length} loans on profile</span>
+                                  </button>
+                                )}
                                 <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-600 dark:text-shark-300 font-semibold px-2 py-0.5 rounded-md border border-slate-200 dark:border-shark-700">
                                   {activeMonthlyRate}%/mo
                                 </span>
@@ -3273,6 +3357,15 @@ export default function App() {
                             >
                               <span>💰</span>
                               <span>Record Payment</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSelectExistingCustomerForLoan(loan.customerId)}
+                              title="Add another separate loan on this borrower's profile"
+                              className="p-2 text-money-600 dark:text-money-400 hover:bg-money-100/50 dark:hover:bg-money-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-money-500/20"
+                            >
+                              <Icons.Plus />
                             </button>
 
                             <button
@@ -3632,24 +3725,63 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Individual Loans on this Customer's Profile */}
+                      {customerLoans.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-shark-750">
+                          <div className="flex items-center justify-between text-[10px] uppercase font-bold text-slate-400 dark:text-shark-500">
+                            <span>Loans on this Profile ({customerLoans.length})</span>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold lowercase">separate dates</span>
+                          </div>
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                            {customerLoans.map((l, i) => {
+                              const calc = calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+                              return (
+                                <div
+                                  key={l.id}
+                                  className="p-2.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200/70 dark:border-shark-700/60 flex items-center justify-between gap-2 text-xs"
+                                >
+                                  <div>
+                                    <div className="font-bold font-mono text-slate-800 dark:text-slate-200">
+                                      Loan #{i + 1}: {formatCurrency(l.principal)}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 dark:text-shark-400 mt-0.5">
+                                      Date: <strong className="text-slate-700 dark:text-shark-300">{formatDate(l.startDate)}</strong> • Due: <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(calc.remainingBalance)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span
+                                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                        l.status === 'ACTIVE'
+                                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                          : 'bg-slate-200 dark:bg-shark-700 text-slate-600 dark:text-shark-300'
+                                      }`}
+                                    >
+                                      {l.status}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPaymentModalLoan(l)}
+                                      className="p-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                                      title="Record repayment on this loan"
+                                    >
+                                      💰
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Actions */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-shark-700/60">
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-shark-700/60">
                         <button
                           type="button"
-                          onClick={() => {
-                            setFormData(prev => ({
-                              ...prev,
-                              customerName: c.name,
-                              customerAddress: c.address || '',
-                              customerAvatar: c.avatar || '',
-                              customerPhone: c.phone || '',
-                            }));
-                            setView('entry');
-                            setEntryMode('manual');
-                          }}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-money-600 dark:text-money-400 hover:text-money-700 dark:hover:text-money-300 py-1"
+                          onClick={() => handleSelectExistingCustomerForLoan(c.id)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-money-600 dark:text-money-400 hover:text-money-700 dark:hover:text-money-300 py-1 cursor-pointer"
                         >
-                          <Icons.Plus /> <span>New Loan</span>
+                          <Icons.Plus /> <span>Add Loan on Profile</span>
                         </button>
 
                         <div className="flex items-center gap-1">
@@ -3929,115 +4061,323 @@ export default function App() {
                   )}
 
                   <div className="space-y-5">
-                    {/* Customer Identity & Profile Section */}
-                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-4">
+                    {/* Customer Profile Mode Switcher (Existing vs New Profile) */}
+                    <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-500 dark:text-shark-500 uppercase">Customer Profile & Photo</label>
+                        <label className="text-xs font-bold text-slate-500 dark:text-shark-400 uppercase tracking-wider">
+                          Borrower Profile Selection
+                        </label>
+                        {customers.length > 0 && (
+                          <span className="text-[11px] text-slate-400 dark:text-shark-500">
+                            {customers.length} profile{customers.length === 1 ? '' : 's'} on record
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                        {/* Avatar Picker Preview */}
-                        <div className="relative shrink-0 flex items-center gap-3">
-                          <CustomerAvatar
-                            name={formData.customerName}
-                            avatar={formData.customerAvatar}
-                            size="xl"
-                            showHoverZoom={Boolean(formData.customerAvatar)}
-                            onClick={() => {
-                              if (formData.customerAvatar) {
-                                setViewingPhotoCustomer({
-                                  name: formData.customerName || 'Customer',
-                                  avatar: formData.customerAvatar,
-                                  address: formData.customerAddress,
-                                  phone: formData.customerPhone,
-                                });
-                              }
-                            }}
-                          />
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => startCamera('user', 'customer_avatar_form')}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-money-600 hover:bg-money-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95"
-                              >
-                                <Icons.Camera />
-                                <span>Take Photo</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => formAvatarFileInputRef.current?.click()}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-slate-200 dark:bg-shark-700 hover:bg-slate-300 dark:hover:bg-shark-600 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95"
-                              >
-                                <Icons.Upload />
-                                <span>Choose Image</span>
-                              </button>
-                              {formData.customerAvatar && (
-                                <>
+                      {/* Segmented Switcher */}
+                      <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-shark-900 rounded-xl border border-slate-200 dark:border-shark-700 text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEntryCustomerMode('existing');
+                          }}
+                          className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            entryCustomerMode === 'existing'
+                              ? 'bg-money-600 text-white shadow-md'
+                              : 'text-slate-600 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <Icons.User />
+                          <span>Existing Profile</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEntryCustomerMode('new');
+                            handleClearSelectedCustomerForLoan();
+                          }}
+                          className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            entryCustomerMode === 'new'
+                              ? 'bg-money-600 text-white shadow-md'
+                              : 'text-slate-600 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <Icons.UserPlus />
+                          <span>New Borrower</span>
+                        </button>
+                      </div>
+
+                      {/* MODE 1: EXISTING BORROWER PROFILE */}
+                      {entryCustomerMode === 'existing' && (
+                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-4">
+                          {selectedExistingCustomerId ? (
+                            /* Currently Selected Customer Summary Card */
+                            (() => {
+                              const selectedCustomer = getCustomer(selectedExistingCustomerId);
+                              const customerLoanList = loans.filter(l => l.customerId === selectedExistingCustomerId);
+                              const activeLoanCount = customerLoanList.filter(l => l.status === 'ACTIVE').length;
+
+                              return (
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                      <span>✓</span> Selected Borrower Profile
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={handleClearSelectedCustomerForLoan}
+                                      className="text-xs text-money-600 dark:text-money-400 hover:underline font-semibold cursor-pointer"
+                                    >
+                                      Switch Profile
+                                    </button>
+                                  </div>
+
+                                  <div className="p-4 rounded-xl bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3.5 min-w-0">
+                                      <CustomerAvatar customer={selectedCustomer} size="lg" />
+                                      <div className="min-w-0">
+                                        <h4 className="font-bold text-base text-slate-900 dark:text-white truncate">
+                                          {selectedCustomer?.name}
+                                        </h4>
+                                        <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-shark-400 mt-0.5">
+                                          {selectedCustomer?.phone && (
+                                            <span className="flex items-center gap-1">
+                                              <Icons.Phone /> {selectedCustomer.phone}
+                                            </span>
+                                          )}
+                                          {selectedCustomer?.address && (
+                                            <span className="flex items-center gap-1 truncate max-w-xs">
+                                              <Icons.MapPin /> {selectedCustomer.address}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="shrink-0 text-right">
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                        {activeLoanCount} active loan{activeLoanCount === 1 ? '' : 's'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                                    <span>💡</span>
+                                    <span>
+                                      This new loan will be added under <strong>{selectedCustomer?.name}</strong> with its own separate date, compounding schedule, and balance.
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            /* Customer Search & Picker */
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600 dark:text-shark-300 mb-1.5">
+                                  Select an existing customer:
+                                </label>
+                                <div className="relative">
+                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <Icons.Search />
+                                  </div>
+                                  <input
+                                    type="text"
+                                    placeholder="Search by name, phone or address..."
+                                    value={customerPickerSearch}
+                                    onChange={(e) => setCustomerPickerSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none text-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              {customers.length === 0 ? (
+                                <div className="text-center py-6 text-slate-400 dark:text-shark-500 text-xs">
+                                  <p>No customers recorded yet.</p>
                                   <button
                                     type="button"
-                                    onClick={() => setViewingPhotoCustomer({
+                                    onClick={() => setEntryCustomerMode('new')}
+                                    className="mt-2 text-money-600 dark:text-money-400 font-bold hover:underline inline-block"
+                                  >
+                                    Create a New Borrower Profile →
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                                  {customers
+                                    .filter((c) => {
+                                      if (!customerPickerSearch) return true;
+                                      const term = customerPickerSearch.toLowerCase();
+                                      return (
+                                        c.name.toLowerCase().includes(term) ||
+                                        (c.phone && c.phone.includes(term)) ||
+                                        (c.address && c.address.toLowerCase().includes(term))
+                                      );
+                                    })
+                                    .map((cust) => {
+                                      const activeCount = loans.filter((l) => l.customerId === cust.id && l.status === 'ACTIVE').length;
+                                      return (
+                                        <button
+                                          key={cust.id}
+                                          type="button"
+                                          onClick={() => handleSelectExistingCustomerForLoan(cust.id)}
+                                          className="w-full p-3 rounded-xl bg-white dark:bg-shark-800 hover:bg-slate-100 dark:hover:bg-shark-700 border border-slate-200 dark:border-shark-700 flex items-center justify-between gap-3 text-left transition-all group cursor-pointer"
+                                        >
+                                          <div className="flex items-center gap-3 min-w-0">
+                                            <CustomerAvatar customer={cust} size="md" />
+                                            <div className="min-w-0">
+                                              <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-money-600 dark:group-hover:text-money-400 transition-colors truncate">
+                                                {cust.name}
+                                              </div>
+                                              <div className="text-[11px] text-slate-500 dark:text-shark-400 truncate">
+                                                {cust.phone ? cust.phone : cust.address ? cust.address : 'No contact details'}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="shrink-0 flex items-center gap-2">
+                                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-shark-900 text-slate-600 dark:text-shark-300 font-medium border border-slate-200 dark:border-shark-700">
+                                              {activeCount} active
+                                            </span>
+                                            <span className="text-xs text-money-600 dark:text-money-400 font-bold group-hover:translate-x-0.5 transition-transform">
+                                              Select →
+                                            </span>
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* MODE 2: CREATE NEW BORROWER PROFILE */}
+                      {entryCustomerMode === 'new' && (
+                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-4">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            {/* Avatar Picker Preview */}
+                            <div className="relative shrink-0 flex items-center gap-3">
+                              <CustomerAvatar
+                                name={formData.customerName}
+                                avatar={formData.customerAvatar}
+                                size="xl"
+                                showHoverZoom={Boolean(formData.customerAvatar)}
+                                onClick={() => {
+                                  if (formData.customerAvatar) {
+                                    setViewingPhotoCustomer({
                                       name: formData.customerName || 'Customer',
                                       avatar: formData.customerAvatar,
                                       address: formData.customerAddress,
                                       phone: formData.customerPhone,
-                                    })}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-money-500/10 hover:bg-money-500/20 text-money-600 dark:text-money-400 text-xs font-semibold rounded-lg border border-money-500/30 transition-all active:scale-95"
+                                    });
+                                  }
+                                }}
+                              />
+                              <div className="flex flex-col gap-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => startCamera('user', 'customer_avatar_form')}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-money-600 hover:bg-money-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
                                   >
-                                    <Icons.Eye />
-                                    <span>View Photo</span>
+                                    <Icons.Camera />
+                                    <span>Take Photo</span>
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => setFormData(prev => ({ ...prev, customerAvatar: '' }))}
-                                    className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-xs"
-                                    title="Remove Photo"
+                                    onClick={() => formAvatarFileInputRef.current?.click()}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-200 dark:bg-shark-700 hover:bg-slate-300 dark:hover:bg-shark-600 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 cursor-pointer"
                                   >
-                                    <Icons.X />
+                                    <Icons.Upload />
+                                    <span>Choose Image</span>
                                   </button>
-                                </>
-                              )}
+                                  {formData.customerAvatar && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingPhotoCustomer({
+                                          name: formData.customerName || 'Customer',
+                                          avatar: formData.customerAvatar,
+                                          address: formData.customerAddress,
+                                          phone: formData.customerPhone,
+                                        })}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-money-500/10 hover:bg-money-500/20 text-money-600 dark:text-money-400 text-xs font-semibold rounded-lg border border-money-500/30 transition-all active:scale-95 cursor-pointer"
+                                      >
+                                        <Icons.Eye />
+                                        <span>View Photo</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, customerAvatar: '' }))}
+                                        className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-xs cursor-pointer"
+                                        title="Remove Photo"
+                                      >
+                                        <Icons.X />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 dark:text-shark-500">
+                                  Attach customer profile picture (optional)
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-[10px] text-slate-400 dark:text-shark-500">
-                              Attach customer profile picture (optional)
-                            </span>
+                          </div>
+
+                          {/* Customer Name with Datalist */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Name *</label>
+                            <input
+                              list="customer-list"
+                              type="text"
+                              required
+                              value={formData.customerName}
+                              onChange={(e) => handleCustomerNameChange(e.target.value)}
+                              placeholder="e.g. Tony Spilotro"
+                              className="w-full bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                            />
+                            <datalist id="customer-list">
+                              {customers.map(c => <option key={c.id} value={c.name} />)}
+                            </datalist>
+                          </div>
+
+                          {/* Customer Address Field */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Residential Address</label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <Icons.MapPin />
+                              </div>
+                              <input
+                                type="text"
+                                value={formData.customerAddress}
+                                onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
+                                placeholder="e.g. 142 Ocean View Ave, Cape Town"
+                                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Customer Phone Field */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Phone Number</label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <Icons.Phone />
+                              </div>
+                              <input
+                                type="tel"
+                                value={formData.customerPhone}
+                                onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                                placeholder="e.g. 082 123 4567"
+                                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Customer Name with Datalist */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Name *</label>
-                        <input
-                          list="customer-list"
-                          type="text"
-                          required
-                          value={formData.customerName}
-                          onChange={(e) => handleCustomerNameChange(e.target.value)}
-                          placeholder="e.g. Tony Spilotro"
-                          className="w-full bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
-                        />
-                        <datalist id="customer-list">
-                          {customers.map(c => <option key={c.id} value={c.name} />)}
-                        </datalist>
-                      </div>
-
-                      {/* Customer Address Field */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Customer Residential Address</label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                            <Icons.MapPin />
-                          </div>
-                          <input
-                            type="text"
-                            value={formData.customerAddress}
-                            onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
-                            placeholder="e.g. 142 Ocean View Ave, Cape Town"
-                            className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-shark-800 border border-slate-300 dark:border-shark-600 rounded-lg text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
-                          />
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-5">
@@ -4053,12 +4393,15 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase mb-1">Start Date</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-500 dark:text-shark-500 uppercase">Start Date *</label>
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Separate Cycle</span>
+                        </div>
                         <input
                           type="date"
                           value={formData.startDate}
                           onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                          className="w-full bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors"
+                          className="w-full bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 rounded-lg p-3 text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors font-mono"
                         />
                       </div>
                     </div>
@@ -4127,7 +4470,7 @@ export default function App() {
 
                     <div className="pt-2">
                       <button
-                        onClick={handleSaveLoan}
+                        onClick={() => handleSaveLoan()}
                         className="w-full py-4 bg-money-600 hover:bg-money-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-money-900/50 transition-all flex items-center justify-center gap-2"
                       >
                         <Icons.Check /> Save Record
@@ -4925,6 +5268,37 @@ export default function App() {
         repayments={repayments}
         onRecordPayment={handleRecordPayment}
         onDeletePayment={handleDeletePayment}
+      />
+
+      {/* DUPLICATE / EXISTING CUSTOMER CONFIRMATION MODAL */}
+      <DuplicateCustomerModal
+        isOpen={Boolean(duplicateCustomerPrompt)}
+        matchingCustomer={duplicateCustomerPrompt?.matchingCustomer || null}
+        newLoanDetails={
+          duplicateCustomerPrompt
+            ? {
+                principal: duplicateCustomerPrompt.loanPayload.principal,
+                startDate: duplicateCustomerPrompt.loanPayload.startDate,
+                notes: duplicateCustomerPrompt.loanPayload.notes,
+              }
+            : null
+        }
+        existingLoans={
+          duplicateCustomerPrompt
+            ? loans.filter((l) => l.customerId === duplicateCustomerPrompt.matchingCustomer.id)
+            : []
+        }
+        repayments={repayments}
+        settings={settings}
+        onConfirmAddToExisting={() => {
+          if (duplicateCustomerPrompt) {
+            handleSaveLoan({ customerId: duplicateCustomerPrompt.matchingCustomer.id });
+          }
+        }}
+        onConfirmCreateSeparate={() => {
+          handleSaveLoan({ forceNewCustomer: true });
+        }}
+        onClose={() => setDuplicateCustomerPrompt(null)}
       />
     </div>
   );

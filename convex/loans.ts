@@ -4,6 +4,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const create = mutation({
   args: {
+    customerId: v.optional(v.id("customers")),
+    forceNewCustomer: v.optional(v.boolean()),
     customerName: v.string(),
     customerAddress: v.optional(v.string()),
     customerAvatar: v.optional(v.string()),
@@ -24,17 +26,34 @@ export const create = mutation({
 
     const customerName = args.customerName.trim();
     
-    // Find or create customer
-    const customers = await ctx.db
-      .query("customers")
-      .withIndex("by_userId_name", (q) => q.eq("userId", userId))
-      .collect();
-      
-    let customer = customers.find(
-      (c) => c.name.toLowerCase() === customerName.toLowerCase()
-    );
+    let customer: any = null;
+    let customerId: any = null;
 
-    let customerId;
+    // 1. If customerId was explicitly passed, attach directly to that existing profile
+    if (args.customerId) {
+      const existing = await ctx.db.get(args.customerId);
+      if (existing && existing.userId === userId && !existing.isDeleted) {
+        customer = existing;
+        customerId = existing._id;
+      }
+    }
+
+    // 2. If not explicitly specified and not forcing a new customer, search by name
+    if (!customer && !args.forceNewCustomer) {
+      const customers = await ctx.db
+        .query("customers")
+        .withIndex("by_userId_name", (q) => q.eq("userId", userId))
+        .collect();
+        
+      customer = customers.find(
+        (c) => !c.isDeleted && c.name.toLowerCase() === customerName.toLowerCase()
+      );
+      if (customer) {
+        customerId = customer._id;
+      }
+    }
+
+    // 3. If customer still not found or forcing new customer, create brand new profile
     if (!customer) {
       customerId = await ctx.db.insert("customers", {
         userId,
@@ -52,10 +71,9 @@ export const create = mutation({
         avatar: args.customerAvatar || "",
         phone: args.customerPhone ? args.customerPhone.trim() : "",
         notes: "",
-      } as any;
+      };
     } else {
-      customerId = customer._id;
-      // If customer was found but we now have address or avatar, update it
+      // If customer exists, update any missing address, avatar, or phone if supplied
       const updates: any = {};
       if (args.customerAddress && (!customer.address || customer.address === "")) {
         updates.address = args.customerAddress.trim();
