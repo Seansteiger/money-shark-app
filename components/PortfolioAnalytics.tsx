@@ -75,12 +75,9 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
       {/* Top Banner Header */}
       <div className="p-5 md:p-6 border-b border-slate-100 dark:border-shark-700/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📊</span>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              Capital Portfolio & Cashflow Analytics
-            </h3>
-          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            Capital Portfolio & Cashflow Analytics
+          </h3>
           <p className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
             Real-time capital deployment, repayment velocity, and risk cycle aging.
           </p>

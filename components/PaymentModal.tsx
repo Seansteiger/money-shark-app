@@ -98,7 +98,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="px-6 py-5 border-b border-slate-200 dark:border-shark-800 bg-slate-50 dark:bg-shark-900/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
-              💰
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+              </svg>
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">

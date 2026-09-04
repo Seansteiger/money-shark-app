@@ -1362,6 +1362,83 @@ export default function App() {
       return 0;
     });
 
+  // Group active loans by customer profile so multi-loan borrowers appear under a single profile card
+  const groupedActiveCustomers = React.useMemo(() => {
+    const groupMap = new Map<string, {
+      customerId: string;
+      customer: Customer | null;
+      loans: Loan[];
+      totalRemainingBalance: number;
+      totalPrincipal: number;
+      totalAccruedInterest: number;
+      totalRepaid: number;
+      newestStartDate: string;
+      mostUrgentDays: number;
+    }>();
+
+    filteredActiveLoans.forEach((loan) => {
+      const cId = loan.customerId || `unknown_${loan.id}`;
+      const calc = calculateLoanDetails(
+        loan,
+        settings.globalInitialInterestRate,
+        settings.globalInterestRate,
+        repayments
+      );
+
+      if (!groupMap.has(cId)) {
+        groupMap.set(cId, {
+          customerId: cId,
+          customer: getCustomer(loan.customerId) || null,
+          loans: [loan],
+          totalRemainingBalance: calc.remainingBalance,
+          totalPrincipal: loan.principal,
+          totalAccruedInterest: calc.interestAccrued,
+          totalRepaid: calc.totalRepaid,
+          newestStartDate: loan.startDate,
+          mostUrgentDays: calc.daysUntilNextCycle,
+        });
+      } else {
+        const entry = groupMap.get(cId)!;
+        entry.loans.push(loan);
+        entry.totalRemainingBalance += calc.remainingBalance;
+        entry.totalPrincipal += loan.principal;
+        entry.totalAccruedInterest += calc.interestAccrued;
+        entry.totalRepaid += calc.totalRepaid;
+        if (loan.startDate > entry.newestStartDate) entry.newestStartDate = loan.startDate;
+        if (calc.daysUntilNextCycle < entry.mostUrgentDays) entry.mostUrgentDays = calc.daysUntilNextCycle;
+      }
+    });
+
+    const groups = Array.from(groupMap.values());
+
+    // Within each customer profile group, sort loans chronologically by start date
+    groups.forEach((g) => {
+      g.loans.sort((a, b) => a.startDate.localeCompare(b.startDate));
+    });
+
+    // Sort customer profile groups according to loanSortBy
+    groups.sort((a, b) => {
+      if (loanSortBy === 'BALANCE_DESC') {
+        return b.totalRemainingBalance - a.totalRemainingBalance;
+      }
+      if (loanSortBy === 'DUE_SOONEST') {
+        return a.mostUrgentDays - b.mostUrgentDays;
+      }
+      if (loanSortBy === 'NEWEST') {
+        return b.newestStartDate.localeCompare(a.newestStartDate);
+      }
+      if (loanSortBy === 'NAME') {
+        const nameA = (a.customer?.name || '').toLowerCase();
+        const nameB = (b.customer?.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+      return 0;
+    });
+
+    return groups;
+  }, [filteredActiveLoans, repayments, settings.globalInitialInterestRate, settings.globalInterestRate, loanSortBy, customers]);
+
+
   // Filter Customers for Directory View
   const filteredCustomers = customers.filter(c => {
     if (!customerSearchTerm) return true;
@@ -3268,41 +3345,35 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="grid gap-4">
-                  {filteredActiveLoans.map((loan) => {
-                    const calc = calculateLoanDetails(
-                      loan,
-                      settings.globalInitialInterestRate,
-                      settings.globalInterestRate,
-                      repayments
-                    );
-                    const activeInitialRate = loan.isFixedRate ? settings.globalInitialInterestRate : loan.initialInterestRate;
-                    const activeMonthlyRate = loan.isFixedRate ? settings.globalInterestRate : loan.interestRate;
+                <div className="grid gap-5">
+                  {groupedActiveCustomers.map((group) => {
+                    const customer = group.customer;
+                    const customerName = customer?.name || 'Customer';
+                    const hasMultipleLoans = group.loans.length > 1;
 
                     return (
                       <div
-                        key={loan.id}
-                        className="bg-white dark:bg-shark-800 p-5 rounded-2xl border border-slate-200 dark:border-shark-700 hover:border-emerald-500/50 dark:hover:border-emerald-500/30 transition-all shadow-sm flex flex-col gap-4"
+                        key={group.customerId}
+                        className="bg-white dark:bg-shark-800 p-5 md:p-6 rounded-3xl border border-slate-200 dark:border-shark-700 hover:border-emerald-500/40 dark:hover:border-emerald-500/30 transition-all shadow-sm flex flex-col gap-4"
                       >
-                        {/* Top Row: Borrower Info & Action Buttons */}
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        {/* Borrower Profile Header */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-slate-100 dark:border-shark-700/70">
                           <div className="flex items-center gap-3.5 min-w-0">
                             <CustomerAvatar
-                              customer={getCustomer(loan.customerId)}
+                              customer={customer}
                               size="lg"
-                              showHoverZoom={Boolean(getCustomer(loan.customerId)?.avatar)}
+                              showHoverZoom={Boolean(customer?.avatar)}
                               onClick={() => {
-                                const c = getCustomer(loan.customerId);
-                                if (c?.avatar) {
+                                if (customer?.avatar) {
                                   setViewingPhotoCustomer({
-                                    name: c.name,
-                                    avatar: c.avatar,
-                                    address: c.address,
-                                    phone: c.phone,
-                                    id: c.id,
+                                    name: customer.name,
+                                    avatar: customer.avatar,
+                                    address: customer.address,
+                                    phone: customer.phone,
+                                    id: customer.id,
                                   });
-                                } else if (c) {
-                                  handleOpenEditCustomerModal(c);
+                                } else if (customer) {
+                                  handleOpenEditCustomerModal(customer);
                                 }
                               }}
                             />
@@ -3311,154 +3382,219 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const c = getCustomer(loan.customerId);
-                                    if (c) handleOpenEditCustomerModal(c);
+                                    if (customer) handleOpenEditCustomerModal(customer);
                                   }}
-                                  className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left truncate"
+                                  className="text-base md:text-lg font-bold text-slate-900 dark:text-white leading-tight hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left truncate cursor-pointer"
                                 >
-                                  {getCustomerName(loan.customerId)}
+                                  {customerName}
                                 </button>
-                                {activeLoans.filter(l => l.customerId === loan.customerId).length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCustomerSearchTerm(getCustomerName(loan.customerId));
-                                      setView('loans');
-                                    }}
-                                    className="text-[10px] md:text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-md border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-pointer"
-                                    title="View all separate loans under this customer profile"
-                                  >
+                                {hasMultipleLoans && (
+                                  <span className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
                                     <span>👥</span>
-                                    <span>{activeLoans.filter(l => l.customerId === loan.customerId).length} loans on profile</span>
-                                  </button>
+                                    <span>{group.loans.length} loans on profile</span>
+                                  </span>
                                 )}
-                                <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-600 dark:text-shark-300 font-semibold px-2 py-0.5 rounded-md border border-slate-200 dark:border-shark-700">
-                                  {activeMonthlyRate}%/mo
-                                </span>
+                                {!hasMultipleLoans && (
+                                  <span className="text-[10px] md:text-xs bg-slate-100 dark:bg-shark-900 text-slate-600 dark:text-shark-300 font-semibold px-2 py-0.5 rounded-md border border-slate-200 dark:border-shark-700">
+                                    {group.loans[0].isFixedRate ? settings.globalInterestRate : group.loans[0].interestRate}%/mo
+                                  </span>
+                                )}
                               </div>
-                              {getCustomer(loan.customerId)?.address && (
-                                <div className="text-[11px] text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-0.5 truncate">
+                              {customer?.address && (
+                                <div className="text-[11px] text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-1 truncate">
                                   <Icons.MapPin />
-                                  <span className="truncate">{getCustomer(loan.customerId)?.address}</span>
+                                  <span className="truncate">{customer.address}</span>
                                 </div>
                               )}
-                              <div className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
-                                Issued {formatDate(loan.startDate)} • Markup: {activeInitialRate}%
-                              </div>
+                              {customer?.phone && (
+                                <div className="text-[11px] text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-0.5">
+                                  <Icons.Phone />
+                                  <span>{customer.phone}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto flex-wrap">
+                          {/* Profile Controls & Combined Debt */}
+                          <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto flex-wrap">
+                            {hasMultipleLoans && (
+                              <div className="text-right hidden sm:block">
+                                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-shark-500 block">Total Active Balance</span>
+                                <span className="font-mono font-bold text-base text-amber-600 dark:text-amber-400">
+                                  {formatCurrency(group.totalRemainingBalance)}
+                                </span>
+                              </div>
+                            )}
                             <button
                               type="button"
-                              onClick={() => setPaymentModalLoan(loan)}
-                              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                              title="Record an installment payment"
-                            >
-                              <span>💰</span>
-                              <span>Record Payment</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSelectExistingCustomerForLoan(loan.customerId)}
-                              title="Add another separate loan on this borrower's profile"
-                              className="p-2 text-money-600 dark:text-money-400 hover:bg-money-100/50 dark:hover:bg-money-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-money-500/20"
+                              onClick={() => handleSelectExistingCustomerForLoan(group.customerId)}
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-shark-900 dark:hover:bg-shark-700 text-slate-700 dark:text-shark-200 rounded-xl text-xs font-bold border border-slate-200 dark:border-shark-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              title="Add another loan under this customer's profile"
                             >
                               <Icons.Plus />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => changeLoanStatus(loan.id, 'PAID')}
-                              title="Mark as Paid in Full"
-                              className="p-2 text-green-600 dark:text-green-400 hover:bg-green-100/50 dark:hover:bg-green-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-green-500/20"
-                            >
-                              <Icons.Check />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => changeLoanStatus(loan.id, 'DEFAULTED')}
-                              title="Mark as Defaulted"
-                              className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-100/50 dark:hover:bg-orange-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-orange-500/20"
-                            >
-                              <Icons.X />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteLoan(loan.id)}
-                              title="Delete Record (moves to 30-day recovery vault)"
-                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-500/20"
-                            >
-                              <Icons.Trash />
+                              <span>Add Loan</span>
                             </button>
                           </div>
                         </div>
 
-                        {/* Middle Row: Compounding Cycle Countdown & Repayment Progress */}
-                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-100 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {calc.riskCategory === 'GRACE_PERIOD' && (
-                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Cycle 1 (Grace Period) • {calc.daysUntilNextCycle} days until Cycle 2 (+{activeMonthlyRate}%)</span>
+                        {/* Individual Loans Under This Profile */}
+                        <div className="space-y-3">
+                          {hasMultipleLoans && (
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-400 dark:text-shark-400 px-1 pt-1">
+                              <span>Loans Under This Profile ({group.loans.length})</span>
+                              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                Individual start dates & balances
                               </span>
-                            )}
-                            {calc.riskCategory === 'COMPOUNDING_1' && (
-                              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                <span>Cycle 2 Active • Compounding (+{activeMonthlyRate}%) • {calc.daysUntilNextCycle} days until Cycle 3</span>
-                              </span>
-                            )}
-                            {calc.riskCategory === 'OVERDUE_HIGH_RISK' && (
-                              <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                                <span>Cycle {calc.monthsElapsed} (High Risk) • {calc.daysUntilNextCycle} days until next compounding</span>
-                              </span>
-                            )}
-                          </div>
-
-                          {calc.totalRepaid > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => setPaymentModalLoan(loan)}
-                              className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer"
-                            >
-                              <span>✓ Paid {formatCurrency(calc.totalRepaid)}</span>
-                              <span className="text-slate-400 dark:text-shark-500 font-normal">
-                                ({calc.repaymentCount} {calc.repaymentCount === 1 ? 'payment' : 'payments'})
-                              </span>
-                            </button>
-                          ) : (
-                            <span className="text-slate-400 dark:text-shark-500 text-[11px]">
-                              No payments logged yet
-                            </span>
+                            </div>
                           )}
-                        </div>
 
-                        {/* Bottom Row: Financial Figures */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full pt-3 border-t border-slate-100 dark:border-shark-700">
-                          <div>
-                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Principal</div>
-                            <div className="text-sm font-mono text-slate-700 dark:text-shark-300 font-medium">{formatCurrency(loan.principal)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Accrued Interest</div>
-                            <div className="text-sm font-mono text-money-600 dark:text-money-500 font-bold">+{formatCurrency(calc.interestAccrued)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Total Repaid</div>
-                            <div className="text-sm font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(calc.totalRepaid)}</div>
-                          </div>
-                          <div className="border-l border-slate-100 dark:border-shark-700 pl-3">
-                            <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-bold">Remaining Balance</div>
-                            <div className="text-base font-mono font-bold text-amber-600 dark:text-amber-400">{formatCurrency(calc.remainingBalance)}</div>
-                          </div>
+                          {group.loans.map((loan, idx) => {
+                            const calc = calculateLoanDetails(
+                              loan,
+                              settings.globalInitialInterestRate,
+                              settings.globalInterestRate,
+                              repayments
+                            );
+                            const activeInitialRate = loan.isFixedRate ? settings.globalInitialInterestRate : loan.initialInterestRate;
+                            const activeMonthlyRate = loan.isFixedRate ? settings.globalInterestRate : loan.interestRate;
+
+                            return (
+                              <div
+                                key={loan.id}
+                                className={`rounded-2xl p-4 transition-all ${
+                                  hasMultipleLoans
+                                    ? 'bg-slate-50/80 dark:bg-shark-900/60 border border-slate-200/80 dark:border-shark-700/70'
+                                    : 'bg-transparent p-0'
+                                } space-y-3`}
+                              >
+                                {/* Loan Header & Action Controls */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                  <div className="flex items-center gap-2.5 flex-wrap">
+                                    {hasMultipleLoans && (
+                                      <span className="px-2.5 py-0.5 rounded-lg bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 font-bold text-xs border border-emerald-500/20 font-mono">
+                                        Loan #{idx + 1}
+                                      </span>
+                                    )}
+                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                                      Issued {formatDate(loan.startDate)}
+                                    </span>
+                                    <span className="text-[11px] bg-slate-200/70 dark:bg-shark-800 text-slate-600 dark:text-shark-300 font-medium px-2 py-0.5 rounded-md">
+                                      Markup: {activeInitialRate}%
+                                    </span>
+                                    <span className="text-[11px] bg-slate-200/70 dark:bg-shark-800 text-slate-600 dark:text-shark-300 font-medium px-2 py-0.5 rounded-md">
+                                      {activeMonthlyRate}%/mo
+                                    </span>
+                                    {loan.notes && (
+                                      <span className="text-[11px] text-slate-500 dark:text-shark-400 italic truncate max-w-xs">
+                                        • {loan.notes}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => setPaymentModalLoan(loan)}
+                                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                                      title="Record an installment payment"
+                                    >
+                                      Record Payment
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => changeLoanStatus(loan.id, 'PAID')}
+                                      title="Mark as Paid in Full"
+                                      className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-100/50 dark:hover:bg-green-950/30 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Icons.Check />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => changeLoanStatus(loan.id, 'DEFAULTED')}
+                                      title="Mark as Defaulted"
+                                      className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-100/50 dark:hover:bg-orange-950/30 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Icons.X />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteLoan(loan.id)}
+                                      title="Delete Record (moves to 30-day recovery vault)"
+                                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Icons.Trash />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Compounding Cycle Countdown & Repayment Progress */}
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-100 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {calc.riskCategory === 'GRACE_PERIOD' && (
+                                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>Cycle 1 (Grace Period) • {calc.daysUntilNextCycle} days until Cycle 2 (+{activeMonthlyRate}%)</span>
+                                      </span>
+                                    )}
+                                    {calc.riskCategory === 'COMPOUNDING_1' && (
+                                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        <span>Cycle 2 Active • Compounding (+{activeMonthlyRate}%) • {calc.daysUntilNextCycle} days until Cycle 3</span>
+                                      </span>
+                                    )}
+                                    {calc.riskCategory === 'OVERDUE_HIGH_RISK' && (
+                                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                        <span>Cycle {calc.monthsElapsed} (High Risk) • {calc.daysUntilNextCycle} days until next compounding</span>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {calc.totalRepaid > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPaymentModalLoan(loan)}
+                                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>✓ Paid {formatCurrency(calc.totalRepaid)}</span>
+                                      <span className="text-slate-400 dark:text-shark-500 font-normal">
+                                        ({calc.repaymentCount} {calc.repaymentCount === 1 ? 'payment' : 'payments'})
+                                      </span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-400 dark:text-shark-500 text-[11px]">
+                                      No payments logged yet
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Financial Figures for this loan */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full pt-1 border-t border-slate-100 dark:border-shark-700/60">
+                                  <div>
+                                    <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Principal</div>
+                                    <div className="text-sm font-mono text-slate-700 dark:text-shark-300 font-medium">{formatCurrency(loan.principal)}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Accrued Interest</div>
+                                    <div className="text-sm font-mono text-money-600 dark:text-money-500 font-bold">+{formatCurrency(calc.interestAccrued)}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-semibold">Total Repaid</div>
+                                    <div className="text-sm font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(calc.totalRepaid)}</div>
+                                  </div>
+                                  <div className="border-l border-slate-100 dark:border-shark-700 pl-3">
+                                    <div className="text-[10px] text-slate-400 dark:text-shark-500 uppercase tracking-wider font-bold">Remaining Balance</div>
+                                    <div className="text-base font-mono font-bold text-amber-600 dark:text-amber-400">{formatCurrency(calc.remainingBalance)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
                   })}
-                  {filteredActiveLoans.length === 0 && (
+                  {groupedActiveCustomers.length === 0 && (
                     <div className="text-center py-12 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-800/50 rounded-2xl border border-slate-200 dark:border-shark-700 border-dashed">
                       <div className="text-3xl mb-2">🔍</div>
                       <p className="text-sm font-semibold text-slate-700 dark:text-shark-300">
@@ -3537,7 +3673,7 @@ export default function App() {
                               title="View Payment Ledger"
                               className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/20 transition-all flex items-center gap-1 cursor-pointer"
                             >
-                              <span>💰 Payments ({calc.repaymentCount})</span>
+                              <span>Payments ({calc.repaymentCount})</span>
                             </button>
                             <button 
                               onClick={() => changeLoanStatus(loan.id, 'ACTIVE')} 
@@ -3761,10 +3897,10 @@ export default function App() {
                                     <button
                                       type="button"
                                       onClick={() => setPaymentModalLoan(l)}
-                                      className="p-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                                      className="px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors cursor-pointer"
                                       title="Record repayment on this loan"
                                     >
-                                      💰
+                                      Pay
                                     </button>
                                   </div>
                                 </div>
