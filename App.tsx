@@ -2329,19 +2329,6 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* 30-Day Recovery Vault Quick Link */}
-          {trashData && trashData.totalCount > 0 && (
-            <button
-              onClick={() => setView('trash')}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold transition-all cursor-pointer shadow-sm animate-pulse"
-              title="View 30-Day Recovery Vault"
-            >
-              <Icons.Archive />
-              <span className="hidden sm:inline">Recovery Vault</span>
-              <span className="px-1.5 py-0.2 bg-amber-500/20 rounded-full font-bold">{trashData.totalCount}</span>
-            </button>
-          )}
-
           {/* Interactive Guided Tour Quick Trigger */}
           <button
             onClick={() => {
