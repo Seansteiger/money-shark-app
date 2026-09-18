@@ -34,6 +34,15 @@ export const resetData = mutation({
       await ctx.db.delete(customer._id);
     }
 
+    // Delete all repayments for this user
+    const repayments = await ctx.db
+      .query("repayments")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const r of repayments) {
+      await ctx.db.delete(r._id);
+    }
+
     // Reset settings
     const existingSettings = await ctx.db
       .query("settings")

@@ -95,8 +95,8 @@ export const recordPayment = mutation({
       loan.startDate
     );
 
-    // If fully paid, update status to PAID automatically
-    if (totalRepaid >= grossDebt && loan.status === "ACTIVE") {
+    // If fully paid, update status to PAID automatically (with 0.01 tolerance for floating point rounding)
+    if (totalRepaid >= grossDebt - 0.01 && loan.status === "ACTIVE") {
       await ctx.db.patch(args.loanId, { status: "PAID" });
     }
 
@@ -110,7 +110,7 @@ export const recordPayment = mutation({
       notes: args.notes || "",
       totalRepaid,
       grossDebt,
-      isFullyPaid: totalRepaid >= grossDebt,
+      isFullyPaid: totalRepaid >= grossDebt - 0.01,
     };
   },
 });
@@ -169,8 +169,8 @@ export const deletePayment = mutation({
         loan.startDate
       );
 
-      // If debt is no longer fully cleared, revert to ACTIVE
-      if (totalRepaid < grossDebt) {
+      // If debt is no longer fully cleared, revert to ACTIVE (with 0.01 tolerance)
+      if (totalRepaid < grossDebt - 0.01) {
         await ctx.db.patch(repayment.loanId, { status: "ACTIVE" });
       }
     }

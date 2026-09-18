@@ -1,4 +1,4 @@
-﻿import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -206,6 +206,15 @@ export const permanentlyDeleteLoan = mutation({
       throw new Error("Loan not found");
     }
 
+    // Clean up all repayments associated with this loan
+    const repayments = await ctx.db
+      .query("repayments")
+      .withIndex("by_loanId", (q) => q.eq("loanId", args.id))
+      .collect();
+    for (const r of repayments) {
+      await ctx.db.delete(r._id);
+    }
+
     await ctx.db.delete(args.id);
     return { success: true };
   },
@@ -233,6 +242,14 @@ export const permanentlyDeleteCustomer = mutation({
       .collect();
 
     for (const l of loans) {
+      // Clean up all repayments associated with this loan
+      const repayments = await ctx.db
+        .query("repayments")
+        .withIndex("by_loanId", (q) => q.eq("loanId", l._id))
+        .collect();
+      for (const r of repayments) {
+        await ctx.db.delete(r._id);
+      }
       await ctx.db.delete(l._id);
     }
 
@@ -256,6 +273,13 @@ export const emptyTrash = mutation({
 
     for (const l of loans) {
       if (l.isDeleted) {
+        const repayments = await ctx.db
+          .query("repayments")
+          .withIndex("by_loanId", (q) => q.eq("loanId", l._id))
+          .collect();
+        for (const r of repayments) {
+          await ctx.db.delete(r._id);
+        }
         await ctx.db.delete(l._id);
       }
     }

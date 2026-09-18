@@ -1332,11 +1332,13 @@ export default function App() {
       const customer = getCustomer(loan.customerId);
       const customerName = (customer?.name || '').toLowerCase();
       const customerAddress = (customer?.address || '').toLowerCase();
+      const customerPhone = (customer?.phone || '').toLowerCase();
       const dateRaw = loan.startDate;
       const dateFormatted = formatDate(loan.startDate).toLowerCase();
       return (
         customerName.includes(term) ||
         customerAddress.includes(term) ||
+        customerPhone.includes(term) ||
         dateRaw.includes(term) ||
         dateFormatted.includes(term)
       );
@@ -3254,7 +3256,7 @@ export default function App() {
                       </div>
                       <input
                         type="text"
-                        placeholder="Search borrower or date..."
+                        placeholder="Search borrower, phone, or date..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
