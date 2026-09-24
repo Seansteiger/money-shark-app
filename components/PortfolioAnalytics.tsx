@@ -173,7 +173,7 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  Grace Period (0–30d)
+                  Cycle 1 (0–30d)
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                   {gracePeriodCount} loans
@@ -192,7 +192,7 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  Cycle 2 Compounding (31–60d)
+                  Cycle 2 (31–60d)
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                   {compoundingCount} loans
@@ -211,7 +211,7 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                  High Risk (60+ days)
+                  Cycle 3+ (60+ days)
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                   {overdueCount} loans

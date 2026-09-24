@@ -300,13 +300,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             /* History Tab */
             <div className="space-y-3">
               {loanRepayments.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-shark-800">
-                  <div className="text-3xl mb-2">📋</div>
-                  <p className="text-sm font-semibold text-slate-700 dark:text-shark-300">No installments logged yet</p>
-                  <p className="text-xs text-slate-500 dark:text-shark-500 mt-1">
-                    Use the "+ Log Transaction" tab to record customer payments.
-                  </p>
-                </div>
+                loan.status === 'PAID' ? (
+                  <div className="text-center py-10 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 p-6 space-y-2">
+                    <div className="text-3xl mb-1">✓</div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Settled in Full</p>
+                    <p className="text-xs text-slate-500 dark:text-shark-400">
+                      Total debt of {formatCurrency(calculations.totalAmount)} was marked as paid and closed.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-slate-400 dark:text-shark-500 bg-slate-50 dark:bg-shark-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-shark-800">
+                    <div className="text-3xl mb-2">📋</div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-shark-300">No installments logged yet</p>
+                    <p className="text-xs text-slate-500 dark:text-shark-500 mt-1">
+                      Use the "+ Log Transaction" tab to record customer payments.
+                    </p>
+                  </div>
+                )
               ) : (
                 <div className="space-y-2.5">
                   {loanRepayments.map((item) => {

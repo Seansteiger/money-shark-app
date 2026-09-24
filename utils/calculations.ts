@@ -70,12 +70,19 @@ export const calculateLoanDetails = (
 
   // Filter repayments for this specific loan
   const loanRepayments = allRepayments.filter(r => r.loanId === loan.id);
-  const totalRepaid = loanRepayments.reduce((sum, r) => sum + r.amount, 0);
-  const remainingBalance = Math.max(0, Math.round((totalAmount - totalRepaid) * 100) / 100);
-  const isFullyPaid = remainingBalance <= 0.01 && (totalRepaid > 0 || loan.status === 'PAID');
-  const repaymentProgress = totalAmount > 0 
-    ? Math.min(100, Math.max(0, Math.round((totalRepaid / totalAmount) * 100))) 
-    : 0;
+  const loggedTotalRepaid = loanRepayments.reduce((sum, r) => sum + r.amount, 0);
+
+  // If a loan is marked PAID:
+  // - Total repaid should equal the full gross debt (or more if logged higher)
+  // - Remaining balance is strictly 0
+  const isPaid = loan.status === 'PAID';
+  const totalRepaid = isPaid ? Math.max(loggedTotalRepaid, totalAmount) : loggedTotalRepaid;
+  const remainingBalance = isPaid ? 0 : Math.max(0, Math.round((totalAmount - totalRepaid) * 100) / 100);
+  const isFullyPaid = isPaid || remainingBalance <= 0.01;
+  const repaymentProgress = isPaid 
+    ? 100 
+    : (totalAmount > 0 ? Math.min(100, Math.max(0, Math.round((totalRepaid / totalAmount) * 100))) : 0);
+  const repaymentCount = isPaid && loanRepayments.length === 0 ? 1 : loanRepayments.length;
 
   let riskCategory: 'GRACE_PERIOD' | 'COMPOUNDING_1' | 'OVERDUE_HIGH_RISK' = 'GRACE_PERIOD';
   if (cycles === 1) {
@@ -93,7 +100,7 @@ export const calculateLoanDetails = (
     totalRepaid,
     remainingBalance,
     repaymentProgress,
-    repaymentCount: loanRepayments.length,
+    repaymentCount,
     isFullyPaid,
     daysElapsed,
     daysInCurrentCycle,

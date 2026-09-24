@@ -154,6 +154,32 @@ export const deleteLoan = mutation({
   },
 });
 
+function computeGrossDebt(
+  principal: number,
+  initialRate: number,
+  monthlyRate: number,
+  interestType: string,
+  startDateStr: string
+): number {
+  const start = new Date(startDateStr);
+  start.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const diffInMs = now.getTime() - start.getTime();
+  const daysElapsed = Math.max(0, diffInMs / (1000 * 60 * 60 * 24));
+  
+  const initialInterestAmount = principal * (initialRate / 100);
+  const baseDebt = principal + initialInterestAmount;
+  const cycles = Math.floor(daysElapsed / 30);
+
+  if (cycles <= 0) {
+    return baseDebt;
+  }
+  if (interestType === "SIMPLE") {
+    return baseDebt * (1 + (monthlyRate / 100) * cycles);
+  }
+  return baseDebt * Math.pow(1 + monthlyRate / 100, cycles);
+}
+
 export const updateStatus = mutation({
   args: {
     id: v.id("loans"),
@@ -173,6 +199,48 @@ export const updateStatus = mutation({
     await ctx.db.patch(args.id, {
       status: args.status,
     });
+
+    // When marking as PAID, ensure a settlement repayment is recorded if balance remains
+    if (args.status === "PAID") {
+      const repayments = await ctx.db
+        .query("repayments")
+        .withIndex("by_loanId", (q) => q.eq("loanId", args.id))
+        .collect();
+      const activeRepayments = repayments.filter((r) => !r.isDeleted);
+      const totalRepaid = activeRepayments.reduce((sum, r) => sum + r.amount, 0);
+
+      const settings = await ctx.db
+        .query("settings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+      const effectiveInitialRate = loan.isFixedRate && settings
+        ? settings.globalInitialInterestRate
+        : loan.initialInterestRate;
+      const effectiveMonthlyRate = loan.isFixedRate && settings
+        ? settings.globalInterestRate
+        : loan.interestRate;
+
+      const grossDebt = computeGrossDebt(
+        loan.principal,
+        effectiveInitialRate,
+        effectiveMonthlyRate,
+        loan.interestType,
+        loan.startDate
+      );
+
+      const diff = grossDebt - totalRepaid;
+      if (diff > 0.01) {
+        await ctx.db.insert("repayments", {
+          userId,
+          loanId: args.id,
+          customerId: loan.customerId,
+          amount: Math.round(diff * 100) / 100,
+          paymentDate: new Date().toISOString().split("T")[0],
+          notes: "Marked as Paid in Full",
+        });
+      }
+    }
 
     return args.status;
   },

@@ -1764,6 +1764,20 @@ export default function App() {
 
   const changeLoanStatus = async (id: string, status: Loan['status']) => {
     try {
+      if (status === 'PAID') {
+        const targetLoan = loans.find(l => l.id === id);
+        if (targetLoan) {
+          const calc = calculateLoanDetails(targetLoan, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+          if (calc.remainingBalance > 0.01) {
+            await handleRecordPayment({
+              loanId: id,
+              amount: calc.remainingBalance,
+              paymentDate: new Date().toISOString().split('T')[0],
+              notes: 'Full settlement (Marked as Paid in Full)',
+            });
+          }
+        }
+      }
       await updateLoanStatus(id, status);
       setLoans(loans.map(l => l.id === id ? { ...l, status } : l));
     } catch (err) {
@@ -1771,6 +1785,35 @@ export default function App() {
       alert("Failed to update status.");
     }
   };
+
+  // Auto-backfill payment record for pre-existing loans marked as PAID that have 0 repayments
+  useEffect(() => {
+    if (!isAuthenticated || loans.length === 0) return;
+    const paidWithoutRepayments = loans.filter(
+      (l) => l.status === 'PAID' && !repayments.some((r) => r.loanId === l.id)
+    );
+    if (paidWithoutRepayments.length > 0) {
+      paidWithoutRepayments.forEach(async (l) => {
+        const calc = calculateLoanDetails(
+          l,
+          settings.globalInitialInterestRate,
+          settings.globalInterestRate,
+          repayments
+        );
+        const amountToSettle = calc.totalAmount > 0 ? calc.totalAmount : l.principal * 1.5;
+        try {
+          await handleRecordPayment({
+            loanId: l.id,
+            amount: amountToSettle,
+            paymentDate: l.startDate || new Date().toISOString().split('T')[0],
+            notes: 'Full settlement (Marked as Paid in Full)',
+          });
+        } catch (e) {
+          console.warn('Auto backfill payment failed for paid loan:', l.id, e);
+        }
+      });
+    }
+  }, [loans, repayments, isAuthenticated]);
 
   const NavItem = ({ id, icon: Icon, label, badge }: any) => (
     <button
@@ -2780,6 +2823,10 @@ export default function App() {
                       <span className="text-money-400 font-bold">•</span>
                       <span><strong className="text-white">Monthly Compounding (%):</strong> Rate compounded every 30 days on overdue balance (e.g. 30%/month).</span>
                     </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-money-400 font-bold">•</span>
+                      <span><strong className="text-white">Understanding Cycles:</strong> <strong>Cycle 1</strong> is the first 30 days (initial markup). <strong>Cycle 2</strong> is days 31–60 (compounds monthly rate). <strong>Cycle 3+</strong> represents each subsequent 30-day compounding period.</span>
+                    </li>
                   </ul>
                 </div>
 
@@ -3306,7 +3353,7 @@ export default function App() {
                     }`}
                   >
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Grace Period (0–30d)</span>
+                    <span>Cycle 1</span>
                   </button>
                   <button
                     type="button"
@@ -3318,7 +3365,7 @@ export default function App() {
                     }`}
                   >
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>Compounding (Cycle 2)</span>
+                    <span>Cycle 2</span>
                   </button>
                   <button
                     type="button"
@@ -3330,7 +3377,7 @@ export default function App() {
                     }`}
                   >
                     <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                    <span>High Risk (60+ days)</span>
+                    <span>Cycle 3+</span>
                   </button>
                 </div>
 
@@ -3520,21 +3567,21 @@ export default function App() {
                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-100 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {calc.riskCategory === 'GRACE_PERIOD' && (
-                                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <span>Cycle 1 (Grace Period) • {calc.daysUntilNextCycle} days until Cycle 2 (+{activeMonthlyRate}%)</span>
+                                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5" title="Cycle 1: 0–30 days initial period">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span>Cycle 1</span>
                                       </span>
                                     )}
                                     {calc.riskCategory === 'COMPOUNDING_1' && (
-                                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                        <span>Cycle 2 Active • Compounding (+{activeMonthlyRate}%) • {calc.daysUntilNextCycle} days until Cycle 3</span>
+                                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5" title="Cycle 2: 31–60 days compounding">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        <span>Cycle 2</span>
                                       </span>
                                     )}
                                     {calc.riskCategory === 'OVERDUE_HIGH_RISK' && (
-                                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                                        <span>Cycle {calc.monthsElapsed} (High Risk) • {calc.daysUntilNextCycle} days until next compounding</span>
+                                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5" title={`Cycle ${calc.monthsElapsed + 1}: 60+ days compounding`}>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                        <span>Cycle {calc.monthsElapsed + 1}</span>
                                       </span>
                                     )}
                                   </div>
