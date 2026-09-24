@@ -296,6 +296,7 @@ export default function App() {
   // Customer Management Mutations
   const saveCustomerMutation = useMutation(api.customers.saveCustomer);
   const deleteCustomerMutation = useMutation(api.customers.deleteCustomer);
+  const cleanupDuplicatesMutation = useMutation((api.repayments as any).cleanupDuplicates);
 
   // 30-Day Cloud Data Recovery & Trash Vault
   const trashData = useQuery(api.trash.listTrash, isAuthenticated ? undefined : "skip");
@@ -389,6 +390,15 @@ export default function App() {
       sessionStorage.removeItem('ms_just_registered');
     }
   };
+
+  // Trigger duplicate settlement cleanup once per session on authentication
+  const hasCleanedUpRef = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && !hasCleanedUpRef.current) {
+      hasCleanedUpRef.current = true;
+      cleanupDuplicatesMutation().catch((e: any) => console.warn('Duplicate cleanup skipped:', e));
+    }
+  }, [isAuthenticated, cleanupDuplicatesMutation]);
 
   // 1. Instant On-Device IndexedDB Hydration (0ms load)
   useEffect(() => {
@@ -1764,20 +1774,6 @@ export default function App() {
 
   const changeLoanStatus = async (id: string, status: Loan['status']) => {
     try {
-      if (status === 'PAID') {
-        const targetLoan = loans.find(l => l.id === id);
-        if (targetLoan) {
-          const calc = calculateLoanDetails(targetLoan, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
-          if (calc.remainingBalance > 0.01) {
-            await handleRecordPayment({
-              loanId: id,
-              amount: calc.remainingBalance,
-              paymentDate: new Date().toISOString().split('T')[0],
-              notes: 'Full settlement (Marked as Paid in Full)',
-            });
-          }
-        }
-      }
       await updateLoanStatus(id, status);
       setLoans(loans.map(l => l.id === id ? { ...l, status } : l));
     } catch (err) {
@@ -1785,35 +1781,6 @@ export default function App() {
       alert("Failed to update status.");
     }
   };
-
-  // Auto-backfill payment record for pre-existing loans marked as PAID that have 0 repayments
-  useEffect(() => {
-    if (!isAuthenticated || loans.length === 0) return;
-    const paidWithoutRepayments = loans.filter(
-      (l) => l.status === 'PAID' && !repayments.some((r) => r.loanId === l.id)
-    );
-    if (paidWithoutRepayments.length > 0) {
-      paidWithoutRepayments.forEach(async (l) => {
-        const calc = calculateLoanDetails(
-          l,
-          settings.globalInitialInterestRate,
-          settings.globalInterestRate,
-          repayments
-        );
-        const amountToSettle = calc.totalAmount > 0 ? calc.totalAmount : l.principal * 1.5;
-        try {
-          await handleRecordPayment({
-            loanId: l.id,
-            amount: amountToSettle,
-            paymentDate: l.startDate || new Date().toISOString().split('T')[0],
-            notes: 'Full settlement (Marked as Paid in Full)',
-          });
-        } catch (e) {
-          console.warn('Auto backfill payment failed for paid loan:', l.id, e);
-        }
-      });
-    }
-  }, [loans, repayments, isAuthenticated]);
 
   const NavItem = ({ id, icon: Icon, label, badge }: any) => (
     <button

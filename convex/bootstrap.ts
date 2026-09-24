@@ -41,14 +41,32 @@ export const get = query({
     // Filter out soft-deleted records (30-day recovery vault items)
     const activeCustomers = customersDocs.filter((c) => !c.isDeleted);
     const activeLoans = loansDocs.filter((l) => !l.isDeleted);
-    const activeRepayments = repaymentsDocs.filter((r) => !r.isDeleted);
+    const activeLoanIds = new Set(activeLoans.map((l) => l._id));
+
+    // Only include repayments that belong to active loans (referential integrity)
+    const activeRepayments = repaymentsDocs.filter((r) => !r.isDeleted && activeLoanIds.has(r.loanId));
+
+    // Deduplicate any duplicate settlement records for the same loan
+    const seenSettlements = new Set<string>();
+    const deduplicatedRepayments: typeof activeRepayments = [];
+    for (const r of activeRepayments) {
+      const isSettlement = r.notes && (r.notes.includes("Paid in Full") || r.notes.includes("Full settlement"));
+      if (isSettlement) {
+        const key = `${r.loanId}_${r.amount}`;
+        if (seenSettlements.has(key)) {
+          continue; // Skip duplicate settlement record
+        }
+        seenSettlements.add(key);
+      }
+      deduplicatedRepayments.push(r);
+    }
 
     // Sort loans by creation time descending
     const sortedLoans = [...activeLoans].sort((a, b) => b._creationTime - a._creationTime);
     // Sort customers by creation time descending
     const sortedCustomers = [...activeCustomers].sort((a, b) => b._creationTime - a._creationTime);
     // Sort repayments by payment date descending
-    const sortedRepayments = [...activeRepayments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+    const sortedRepayments = [...deduplicatedRepayments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
 
     return {
       settings: settingsDoc

@@ -52,24 +52,13 @@ export const recordPayment = mutation({
       throw new Error("Loan not found");
     }
 
-    // Insert repayment record
-    const repaymentId = await ctx.db.insert("repayments", {
-      userId,
-      loanId: args.loanId,
-      customerId: loan.customerId,
-      amount: args.amount,
-      paymentDate: args.paymentDate || new Date().toISOString().split("T")[0],
-      paymentMethod: args.paymentMethod || undefined,
-      notes: args.notes || "",
-    });
-
-    // Fetch all active repayments for this loan to verify remaining balance
-    const repayments = await ctx.db
+    // Fetch existing active repayments for this loan first to verify balance
+    const existingRepayments = await ctx.db
       .query("repayments")
       .withIndex("by_loanId", (q) => q.eq("loanId", args.loanId))
       .collect();
 
-    const totalRepaid = repayments
+    const currentRepaid = existingRepayments
       .filter((r) => !r.isDeleted)
       .reduce((sum, r) => sum + r.amount, 0);
 
@@ -95,8 +84,29 @@ export const recordPayment = mutation({
       loan.startDate
     );
 
+    const remainingDebt = Math.max(0, grossDebt - currentRepaid);
+    if (remainingDebt <= 0.01 && loan.status === "PAID") {
+      throw new Error("This loan is already paid in full");
+    }
+
+    // Strictly cap payment amount at remaining balance to prevent overpayments or duplicates
+    const actualAmount = Math.min(args.amount, Math.round(remainingDebt * 100) / 100);
+
+    // Insert repayment record
+    const repaymentId = await ctx.db.insert("repayments", {
+      userId,
+      loanId: args.loanId,
+      customerId: loan.customerId,
+      amount: actualAmount,
+      paymentDate: args.paymentDate || new Date().toISOString().split("T")[0],
+      paymentMethod: args.paymentMethod || undefined,
+      notes: args.notes || "",
+    });
+
+    const newTotalRepaid = currentRepaid + actualAmount;
+
     // If fully paid, update status to PAID automatically (with 0.01 tolerance for floating point rounding)
-    if (totalRepaid >= grossDebt - 0.01 && loan.status === "ACTIVE") {
+    if (newTotalRepaid >= grossDebt - 0.01 && loan.status === "ACTIVE") {
       await ctx.db.patch(args.loanId, { status: "PAID" });
     }
 
@@ -104,13 +114,13 @@ export const recordPayment = mutation({
       id: repaymentId,
       loanId: args.loanId,
       customerId: loan.customerId,
-      amount: args.amount,
+      amount: actualAmount,
       paymentDate: args.paymentDate,
       paymentMethod: args.paymentMethod,
       notes: args.notes || "",
-      totalRepaid,
+      totalRepaid: newTotalRepaid,
       grossDebt,
-      isFullyPaid: totalRepaid >= grossDebt - 0.01,
+      isFullyPaid: newTotalRepaid >= grossDebt - 0.01,
     };
   },
 });
@@ -207,5 +217,83 @@ export const listByLoan = query({
         notes: p.notes || "",
         createdAt: p._creationTime,
       }));
+  },
+});
+
+export const cleanupDuplicates = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    const loans = await ctx.db
+      .query("loans")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    let deletedCount = 0;
+
+    for (const loan of loans) {
+      const repayments = await ctx.db
+        .query("repayments")
+        .withIndex("by_loanId", (q) => q.eq("loanId", loan._id))
+        .collect();
+
+      const active = repayments.filter((r) => !r.isDeleted);
+      if (active.length <= 1) continue;
+
+      const effectiveInitialRate = loan.isFixedRate && settings
+        ? settings.globalInitialInterestRate
+        : loan.initialInterestRate;
+      const effectiveMonthlyRate = loan.isFixedRate && settings
+        ? settings.globalInterestRate
+        : loan.interestRate;
+
+      const grossDebt = computeGrossDebt(
+        loan.principal,
+        effectiveInitialRate,
+        effectiveMonthlyRate,
+        loan.interestType,
+        loan.startDate
+      );
+
+      // Deduplicate settlement payments and excessive duplicate records
+      const seenSettlementKeys = new Set<string>();
+      let runningTotal = 0;
+
+      for (const r of active) {
+        const isSettlement = r.notes && (r.notes.includes("Paid in Full") || r.notes.includes("Full settlement"));
+        const key = `${r.amount}_${r.paymentDate}`;
+
+        if (isSettlement && seenSettlementKeys.has(key)) {
+          // Exact duplicate settlement record! Delete it!
+          await ctx.db.delete(r._id);
+          deletedCount++;
+          continue;
+        }
+
+        if (isSettlement) {
+          seenSettlementKeys.add(key);
+        }
+
+        // If running total already covers grossDebt and this is an extra settlement payment, delete it
+        if (runningTotal >= grossDebt - 0.01 && isSettlement) {
+          await ctx.db.delete(r._id);
+          deletedCount++;
+          continue;
+        }
+
+        runningTotal += r.amount;
+      }
+    }
+
+    return { success: true, deletedCount };
   },
 });

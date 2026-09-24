@@ -57,6 +57,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
+    if (remaining <= 0.01) {
+      setErrorMessage('This loan is already fully settled.');
+      return;
+    }
+
+    if (numAmount > remaining + 0.01) {
+      setErrorMessage(`Payment amount cannot exceed remaining balance of ${formatCurrency(remaining)}.`);
+      return;
+    }
+
     setErrorMessage('');
     setIsSubmitting(true);
     try {
@@ -209,12 +219,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <input
                     type="number"
                     step="0.01"
-                    min="1"
+                    min="0.01"
+                    max={remaining > 0 ? remaining : undefined}
+                    disabled={remaining <= 0.01}
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full pl-9 pr-4 py-3 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white font-mono font-bold text-lg focus:border-emerald-500 outline-none transition-colors"
+                    className="w-full pl-9 pr-4 py-3 bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white font-mono font-bold text-lg focus:border-emerald-500 outline-none transition-colors disabled:opacity-50"
                   />
                 </div>
 

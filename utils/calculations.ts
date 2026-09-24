@@ -68,21 +68,30 @@ export const calculateLoanDetails = (
 
   const interestAccrued = Math.max(0, totalAmount - principal);
 
-  // Filter repayments for this specific loan
+  // Filter repayments for this specific loan (deduplicating any duplicate settlement records)
   const loanRepayments = allRepayments.filter(r => r.loanId === loan.id);
-  const loggedTotalRepaid = loanRepayments.reduce((sum, r) => sum + r.amount, 0);
+  const uniqueRepayments = loanRepayments.filter((r, idx, arr) => {
+    if (r.notes && (r.notes.includes("Paid in Full") || r.notes.includes("Full settlement"))) {
+      return arr.findIndex(x => x.amount === r.amount && x.paymentDate === r.paymentDate) === idx;
+    }
+    return true;
+  });
+
+  const loggedTotalRepaid = uniqueRepayments.reduce((sum, r) => sum + r.amount, 0);
 
   // If a loan is marked PAID:
-  // - Total repaid should equal the full gross debt (or more if logged higher)
+  // - Total repaid should equal the full gross debt (strictly capped to never exceed gross debt)
+  // - If no manual repayments are logged, totalRepaid defaults to totalAmount
   // - Remaining balance is strictly 0
   const isPaid = loan.status === 'PAID';
-  const totalRepaid = isPaid ? Math.max(loggedTotalRepaid, totalAmount) : loggedTotalRepaid;
+  const cappedRepaid = Math.min(loggedTotalRepaid, totalAmount);
+  const totalRepaid = isPaid && loggedTotalRepaid === 0 ? totalAmount : cappedRepaid;
   const remainingBalance = isPaid ? 0 : Math.max(0, Math.round((totalAmount - totalRepaid) * 100) / 100);
   const isFullyPaid = isPaid || remainingBalance <= 0.01;
   const repaymentProgress = isPaid 
     ? 100 
     : (totalAmount > 0 ? Math.min(100, Math.max(0, Math.round((totalRepaid / totalAmount) * 100))) : 0);
-  const repaymentCount = isPaid && loanRepayments.length === 0 ? 1 : loanRepayments.length;
+  const repaymentCount = isPaid && uniqueRepayments.length === 0 ? 1 : uniqueRepayments.length;
 
   let riskCategory: 'GRACE_PERIOD' | 'COMPOUNDING_1' | 'OVERDUE_HIGH_RISK' = 'GRACE_PERIOD';
   if (cycles === 1) {

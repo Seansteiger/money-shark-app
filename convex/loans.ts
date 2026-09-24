@@ -240,6 +240,17 @@ export const updateStatus = mutation({
           notes: "Marked as Paid in Full",
         });
       }
+    } else if (args.status === "ACTIVE") {
+      // If re-activating a previously paid loan, remove any automatic settlement records so remaining balance is restored
+      const repayments = await ctx.db
+        .query("repayments")
+        .withIndex("by_loanId", (q) => q.eq("loanId", args.id))
+        .collect();
+      for (const r of repayments) {
+        if (!r.isDeleted && r.notes && (r.notes.includes("Paid in Full") || r.notes.includes("Full settlement"))) {
+          await ctx.db.patch(r._id, { isDeleted: true, deletedAt: Date.now() });
+        }
+      }
     }
 
     return args.status;
