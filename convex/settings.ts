@@ -9,6 +9,9 @@ export const save = mutation({
     globalCompoundMonthly: v.boolean(),
     isBiometricLockEnabled: v.optional(v.boolean()),
     showHints: v.optional(v.boolean()),
+    autoRemoveInactiveClients: v.optional(v.boolean()),
+    loanSortBy: v.optional(v.string()),
+    clientSortBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -36,6 +39,18 @@ export const save = mutation({
       data.showHints = args.showHints;
     }
 
+    if (args.autoRemoveInactiveClients !== undefined) {
+      data.autoRemoveInactiveClients = args.autoRemoveInactiveClients;
+    }
+
+    if (args.loanSortBy !== undefined) {
+      data.loanSortBy = args.loanSortBy;
+    }
+
+    if (args.clientSortBy !== undefined) {
+      data.clientSortBy = args.clientSortBy;
+    }
+
     if (existing) {
       await ctx.db.patch(existing._id, data);
     } else {
@@ -48,6 +63,9 @@ export const save = mutation({
       globalCompoundMonthly: args.globalCompoundMonthly,
       isBiometricLockEnabled: args.isBiometricLockEnabled ?? existing?.isBiometricLockEnabled ?? false,
       showHints: args.showHints ?? existing?.showHints ?? true,
+      autoRemoveInactiveClients: args.autoRemoveInactiveClients ?? existing?.autoRemoveInactiveClients ?? false,
+      loanSortBy: args.loanSortBy ?? existing?.loanSortBy ?? "BALANCE_DESC",
+      clientSortBy: args.clientSortBy ?? existing?.clientSortBy ?? "NAME_ASC",
     };
   },
 });

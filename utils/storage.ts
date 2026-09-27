@@ -146,6 +146,8 @@ const KEYS = {
   THEME: 'ms_preference_theme',
   FIXED_RATE_PREF: 'ms_preference_fixed_rate',
   SEARCH_HISTORY: 'ms_search_history',
+  LOAN_SORT: 'ms_preference_loan_sort',
+  CLIENT_SORT: 'ms_preference_client_sort',
 };
 
 export interface CachedSnapshot {
@@ -191,6 +193,36 @@ export const saveThemePreference = async (theme: 'dark' | 'light') => {
 
 export const getThemePreference = async (): Promise<'dark' | 'light' | null> => {
   return await deviceStorage.get<'dark' | 'light'>(KEYS.THEME);
+};
+
+export const saveLoanSortPreference = async (sort: string) => {
+  try {
+    localStorage.setItem(KEYS.LOAN_SORT, sort);
+  } catch {}
+  await deviceStorage.set(KEYS.LOAN_SORT, sort);
+};
+
+export const getLoanSortPreference = async (): Promise<string | null> => {
+  try {
+    const val = localStorage.getItem(KEYS.LOAN_SORT);
+    if (val) return val;
+  } catch {}
+  return await deviceStorage.get<string>(KEYS.LOAN_SORT);
+};
+
+export const saveClientSortPreference = async (sort: string) => {
+  try {
+    localStorage.setItem(KEYS.CLIENT_SORT, sort);
+  } catch {}
+  await deviceStorage.set(KEYS.CLIENT_SORT, sort);
+};
+
+export const getClientSortPreference = async (): Promise<string | null> => {
+  try {
+    const val = localStorage.getItem(KEYS.CLIENT_SORT);
+    if (val) return val;
+  } catch {}
+  return await deviceStorage.get<string>(KEYS.CLIENT_SORT);
 };
 
 export const clearAllDeviceStorage = async () => {

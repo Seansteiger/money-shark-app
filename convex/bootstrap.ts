@@ -8,6 +8,9 @@ const DEFAULT_SETTINGS = {
   globalCompoundMonthly: true,
   isBiometricLockEnabled: false,
   showHints: true,
+  autoRemoveInactiveClients: false,
+  loanSortBy: "BALANCE_DESC",
+  clientSortBy: "NAME_ASC",
 };
 
 export const get = query({
@@ -76,6 +79,9 @@ export const get = query({
             globalCompoundMonthly: settingsDoc.globalCompoundMonthly,
             isBiometricLockEnabled: settingsDoc.isBiometricLockEnabled ?? false,
             showHints: settingsDoc.showHints ?? true,
+            autoRemoveInactiveClients: settingsDoc.autoRemoveInactiveClients ?? false,
+            loanSortBy: settingsDoc.loanSortBy ?? "BALANCE_DESC",
+            clientSortBy: settingsDoc.clientSortBy ?? "NAME_ASC",
           }
         : DEFAULT_SETTINGS,
       customers: sortedCustomers.map((c) => ({

@@ -43,6 +43,10 @@ export const deleteCustomer = async (id: string) => {
   return convex.mutation(api.customers.deleteCustomer, { id: id as any });
 };
 
+export const cleanupInactiveClients = async () => {
+  return convex.mutation((api.customers as any).cleanupInactiveClients);
+};
+
 export const deleteLoan = async (id: string) => {
   return convex.mutation(api.loans.deleteLoan, { id: id as any });
 };

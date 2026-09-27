@@ -31,6 +31,10 @@ import {
   saveThemePreference,
   getThemePreference,
   clearAllDeviceStorage,
+  saveLoanSortPreference,
+  getLoanSortPreference,
+  saveClientSortPreference,
+  getClientSortPreference,
 } from './utils/storage';
 import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
 import { PaymentModal } from './components/PaymentModal';
@@ -222,6 +226,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   globalCompoundMonthly: true,
   isBiometricLockEnabled: false,
   showHints: true,
+  autoRemoveInactiveClients: false,
+  loanSortBy: 'BALANCE_DESC',
+  clientSortBy: 'NAME_ASC',
 };
 
 
@@ -297,6 +304,7 @@ export default function App() {
   const saveCustomerMutation = useMutation(api.customers.saveCustomer);
   const deleteCustomerMutation = useMutation(api.customers.deleteCustomer);
   const cleanupDuplicatesMutation = useMutation((api.repayments as any).cleanupDuplicates);
+  const cleanupInactiveClientsMutation = useMutation((api.customers as any).cleanupInactiveClients);
 
   // 30-Day Cloud Data Recovery & Trash Vault
   const trashData = useQuery(api.trash.listTrash, isAuthenticated ? undefined : "skip");
@@ -333,6 +341,8 @@ export default function App() {
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [customerModalError, setCustomerModalError] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [customerFilterTab, setCustomerFilterTab] = useState<'ALL' | 'ACTIVE' | 'SETTLED'>('ALL');
+  const [customerSortBy, setCustomerSortBy] = useState<'NAME_ASC' | 'NAME_DESC' | 'ACTIVE_FIRST' | 'DEBT_DESC'>('NAME_ASC');
 
   // Customer Profile Photo Lightbox Viewer State
   const [viewingPhotoCustomer, setViewingPhotoCustomer] = useState<{
@@ -409,10 +419,20 @@ export default function App() {
         const savedTheme = await getThemePreference();
         if (savedTheme && isMounted) setTheme(savedTheme);
 
+        // Hydrate Saved Loan & Client Sort Preferences
+        const savedSort = (await getLoanSortPreference()) || localStorage.getItem('ms_preference_loan_sort');
+        if (savedSort && isMounted) setLoanSortBy(savedSort as any);
+        const savedClientSort = (await getClientSortPreference()) || localStorage.getItem('ms_preference_client_sort');
+        if (savedClientSort && isMounted) setCustomerSortBy(savedClientSort as any);
+
         // Hydrate Cached Snapshot
         const cached = await getCachedSnapshot();
         if (cached && isMounted) {
-          if (cached.settings) setSettings(cached.settings);
+          if (cached.settings) {
+            setSettings(cached.settings);
+            if (cached.settings.loanSortBy) setLoanSortBy(cached.settings.loanSortBy as any);
+            if (cached.settings.clientSortBy) setCustomerSortBy(cached.settings.clientSortBy as any);
+          }
           if (cached.customers?.length) setCustomers(cached.customers);
           if (cached.loans?.length) setLoans(cached.loans);
           if (cached.repayments?.length) setRepayments(cached.repayments);
@@ -439,7 +459,18 @@ export default function App() {
   // 2. Sync Live Convex Data to state and asynchronously mirror to IndexedDB
   useEffect(() => {
     if (liveData) {
-      setSettings(liveData.settings);
+      setSettings(liveData.settings as any);
+      if (liveData.settings.loanSortBy) {
+        setLoanSortBy(liveData.settings.loanSortBy as any);
+        saveLoanSortPreference(liveData.settings.loanSortBy);
+      }
+      if (liveData.settings.clientSortBy) {
+        setCustomerSortBy(liveData.settings.clientSortBy as any);
+        saveClientSortPreference(liveData.settings.clientSortBy);
+      }
+      if (liveData.settings.autoRemoveInactiveClients) {
+        cleanupInactiveClientsMutation().catch((e: any) => console.warn('Auto inactive cleanup skipped:', e));
+      }
       setCustomers(liveData.customers);
       setLoans(liveData.loans as any[]);
       const liveRepayments = (liveData as any).repayments || [];
@@ -882,9 +913,22 @@ export default function App() {
 
   const handleSaveSettings = async () => {
     try {
-      const saved = await saveSettings(tempSettings);
-      setSettings(saved);
-      setTempSettings(saved);
+      const payload: AppSettings = {
+        ...tempSettings,
+        loanSortBy,
+        clientSortBy: customerSortBy,
+      };
+      const saved = await saveSettings(payload);
+      setSettings(saved as any);
+      setTempSettings(saved as any);
+
+      if (tempSettings.autoRemoveInactiveClients) {
+        cleanupInactiveClientsMutation().then((res: any) => {
+          if (res?.archivedCount > 0) {
+            setTrashActionStatus(`Auto-archived ${res.archivedCount} inactive client(s) to 30-Day Recovery Vault.`);
+          }
+        }).catch((e: any) => console.warn('Inactive cleanup failed:', e));
+      }
 
       // Mirror biometric setting locally
       if (tempSettings.isBiometricLockEnabled !== undefined) {
@@ -974,6 +1018,28 @@ export default function App() {
       setAuthError(err.message || 'Passkey verification failed. Please sign in with password or email code.');
     } finally {
       setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleLoanSortChange = (newSort: 'BALANCE_DESC' | 'DUE_SOONEST' | 'NEWEST' | 'NAME') => {
+    setLoanSortBy(newSort);
+    saveLoanSortPreference(newSort);
+    if (isAuthenticated) {
+      saveSettings({
+        ...settings,
+        loanSortBy: newSort,
+      }).catch((e: any) => console.warn('Failed to save sort pref to cloud:', e));
+    }
+  };
+
+  const handleCustomerSortChange = (newSort: 'NAME_ASC' | 'NAME_DESC' | 'ACTIVE_FIRST' | 'DEBT_DESC') => {
+    setCustomerSortBy(newSort);
+    saveClientSortPreference(newSort);
+    if (isAuthenticated) {
+      saveSettings({
+        ...settings,
+        clientSortBy: newSort,
+      }).catch((e: any) => console.warn('Failed to save client sort pref to cloud:', e));
     }
   };
 
@@ -1451,12 +1517,60 @@ export default function App() {
   }, [filteredActiveLoans, repayments, settings.globalInitialInterestRate, settings.globalInterestRate, loanSortBy, customers]);
 
 
-  // Filter Customers for Directory View
-  const filteredCustomers = customers.filter(c => {
-    if (!customerSearchTerm) return true;
-    const term = customerSearchTerm.toLowerCase();
-    return c.name.toLowerCase().includes(term) || (c.address || '').toLowerCase().includes(term) || (c.phone || '').toLowerCase().includes(term);
-  });
+  // Filter & Sort Customers for Client List View
+  const filteredCustomers = React.useMemo(() => {
+    const result = customers.filter((c) => {
+      if (customerSearchTerm) {
+        const term = customerSearchTerm.toLowerCase();
+        const matches =
+          c.name.toLowerCase().includes(term) ||
+          (c.address || '').toLowerCase().includes(term) ||
+          (c.phone || '').toLowerCase().includes(term);
+        if (!matches) return false;
+      }
+
+      const custLoans = loans.filter((l) => l.customerId === c.id);
+      const hasActive = custLoans.some((l) => l.status === 'ACTIVE');
+
+      if (customerFilterTab === 'ACTIVE') {
+        return hasActive;
+      }
+      if (customerFilterTab === 'SETTLED') {
+        return !hasActive && custLoans.length > 0;
+      }
+      return true;
+    });
+
+    result.sort((a, b) => {
+      if (customerSortBy === 'NAME_ASC') {
+        return a.name.localeCompare(b.name);
+      }
+      if (customerSortBy === 'NAME_DESC') {
+        return b.name.localeCompare(a.name);
+      }
+      if (customerSortBy === 'ACTIVE_FIRST') {
+        const aActive = loans.some((l) => l.customerId === a.id && l.status === 'ACTIVE') ? 1 : 0;
+        const bActive = loans.some((l) => l.customerId === b.id && l.status === 'ACTIVE') ? 1 : 0;
+        return bActive - aActive;
+      }
+      if (customerSortBy === 'DEBT_DESC') {
+        const aDebt = loans.filter((l) => l.customerId === a.id && l.status === 'ACTIVE').reduce((sum, l) => sum + l.principal, 0);
+        const bDebt = loans.filter((l) => l.customerId === b.id && l.status === 'ACTIVE').reduce((sum, l) => sum + l.principal, 0);
+        return bDebt - aDebt;
+      }
+      return 0;
+    });
+
+    return result;
+  }, [customers, loans, customerSearchTerm, customerFilterTab, customerSortBy]);
+
+  const activeClientsCount = React.useMemo(() => {
+    return customers.filter((c) => loans.some((l) => l.customerId === c.id && l.status === 'ACTIVE')).length;
+  }, [customers, loans]);
+
+  const settledClientsCount = React.useMemo(() => {
+    return customers.filter((c) => !loans.some((l) => l.customerId === c.id && l.status === 'ACTIVE') && loans.some((l) => l.customerId === c.id)).length;
+  }, [customers, loans]);
 
   // --- Live Camera & AI Image Handling ---
   const startCamera = async (
@@ -2406,9 +2520,9 @@ export default function App() {
           )}
 
           <nav className="space-y-2">
-            <NavItem id="dashboard" icon={Icons.TrendingUp} label="Overview" />
-            <NavItem id="loans" icon={Icons.Users} label="Loans & Customers" />
-            <NavItem id="entry" icon={Icons.Plus} label="New Entry" />
+            <NavItem id="dashboard" icon={Icons.TrendingUp} label="Overview & Loans" />
+            <NavItem id="loans" icon={Icons.Users} label="Client List" badge={customers.length} />
+            <NavItem id="entry" icon={Icons.Plus} label="New Loan" />
             <NavItem id="settings" icon={Icons.Settings} label="Global Settings" />
             <NavItem
               id="trash"
@@ -3279,13 +3393,13 @@ export default function App() {
 
                     <select
                       value={loanSortBy}
-                      onChange={(e) => setLoanSortBy(e.target.value as any)}
+                      onChange={(e) => handleLoanSortChange(e.target.value as any)}
                       className="px-3 py-2 bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-shark-200 focus:border-money-500 outline-none transition-colors cursor-pointer"
                     >
                       <option value="BALANCE_DESC">Highest Balance</option>
                       <option value="DUE_SOONEST">Compounding Soonest</option>
                       <option value="NEWEST">Newest First</option>
-                      <option value="NAME">Borrower Name (A-Z)</option>
+                      <option value="NAME">Alphabetical (A–Z)</option>
                     </select>
 
                     <button
@@ -3669,7 +3783,16 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1 md:gap-2 shrink-0">
+                          <div className="flex items-center gap-1 md:gap-2 shrink-0 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectExistingCustomerForLoan(loan.customerId)}
+                              className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-900 text-white rounded-xl text-xs font-bold border border-emerald-700/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              title={`Add new loan under ${getCustomerName(loan.customerId)}'s profile`}
+                            >
+                              <Icons.Plus />
+                              <span>Add Loan</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => setPaymentModalLoan(loan)}
@@ -3726,34 +3849,122 @@ export default function App() {
             </>
           )}
 
-          {/* VIEW: CUSTOMER DIRECTORY & PROFILES */}
+          {/* VIEW: CLIENT LIST & BORROWER PROFILES */}
           {view === 'loans' && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Customer Directory</h2>
-                  <p className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">Manage borrower profiles, photos, residential addresses, and balances</p>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Client List</h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-money-500/10 text-money-600 dark:text-money-400 border border-money-500/20">
+                      {customers.length} client{customers.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-shark-400 mt-0.5">
+                    Client profiles remain permanently in your database even after loans are repaid. Add new loans anytime without creating duplicate profiles.
+                  </p>
                 </div>
 
-                <div className="flex w-full sm:w-auto gap-3">
-                  <div className="relative flex-1 sm:w-64">
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleOpenNewCustomerModal}
+                    className="bg-money-600 hover:bg-money-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-money-900/20 whitespace-nowrap text-sm font-semibold cursor-pointer"
+                  >
+                    <Icons.UserPlus /> <span>New Client Profile</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search & Sort Control Bar */}
+              <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between bg-white dark:bg-shark-800/80 p-3 rounded-2xl border border-slate-200 dark:border-shark-700 shadow-sm">
+                {/* Status Filter Tabs */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-shark-900 rounded-xl overflow-x-auto">
+                  <button
+                    type="button"
+                    onClick={() => setCustomerFilterTab('ALL')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      customerFilterTab === 'ALL'
+                        ? 'bg-white dark:bg-shark-750 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>All Clients</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-shark-700 text-slate-700 dark:text-shark-300 font-mono">
+                      {customers.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCustomerFilterTab('ACTIVE')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      customerFilterTab === 'ACTIVE'
+                        ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/30'
+                        : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                    <span>Active Loans</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${customerFilterTab === 'ACTIVE' ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-200 dark:bg-shark-700 text-slate-700 dark:text-shark-300'}`}>
+                      {activeClientsCount}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCustomerFilterTab('SETTLED')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      customerFilterTab === 'SETTLED'
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/30'
+                        : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>Fully Repaid</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${customerFilterTab === 'SETTLED' ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 dark:bg-shark-700 text-slate-700 dark:text-shark-300'}`}>
+                      {settledClientsCount}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Search & Sort Controls */}
+                <div className="flex flex-col sm:flex-row gap-2.5 items-center">
+                  <div className="relative w-full sm:w-60">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Icons.Search />
                     </div>
                     <input
                       type="text"
-                      placeholder="Search name or address..."
+                      placeholder="Search name, phone, address..."
                       value={customerSearchTerm}
                       onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-white dark:bg-shark-800 border border-slate-200 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-sm"
+                      className="w-full pl-9 pr-7 py-1.5 bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white focus:border-money-500 outline-none transition-colors text-xs"
                     />
+                    {customerSearchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomerSearchTerm('')}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-shark-200 text-xs cursor-pointer"
+                        title="Clear search"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={handleOpenNewCustomerModal}
-                    className="bg-money-600 hover:bg-money-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-money-900/20 whitespace-nowrap text-sm font-semibold"
-                  >
-                    <Icons.UserPlus /> <span>New Customer</span>
-                  </button>
+
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                    <span className="text-xs text-slate-500 dark:text-shark-400 shrink-0 hidden sm:inline">Sort:</span>
+                    <select
+                      value={customerSortBy}
+                      onChange={(e) => handleCustomerSortChange(e.target.value as any)}
+                      className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 rounded-xl text-slate-900 dark:text-white text-xs font-semibold focus:border-money-500 outline-none transition-colors cursor-pointer"
+                      title="Sorting preference is permanently saved for your account"
+                    >
+                      <option value="NAME_ASC">Name (A → Z)</option>
+                      <option value="NAME_DESC">Name (Z → A)</option>
+                      <option value="ACTIVE_FIRST">Active Loans First</option>
+                      <option value="DEBT_DESC">Highest Debt First</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -3820,12 +4031,28 @@ export default function App() {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h3
-                            onClick={() => handleOpenEditCustomerModal(c)}
-                            className="font-bold text-lg text-slate-900 dark:text-white truncate cursor-pointer hover:text-money-600 dark:hover:text-money-400 transition-colors"
-                          >
-                            {c.name}
-                          </h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3
+                              onClick={() => handleOpenEditCustomerModal(c)}
+                              className="font-bold text-lg text-slate-900 dark:text-white truncate cursor-pointer hover:text-money-600 dark:hover:text-money-400 transition-colors"
+                            >
+                              {c.name}
+                            </h3>
+                            {activeCustLoans.length > 0 ? (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                {activeCustLoans.length} Active
+                              </span>
+                            ) : customerLoans.length > 0 ? (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                ✓ Settled
+                              </span>
+                            ) : (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">
+                                Profile Only
+                              </span>
+                            )}
+                          </div>
 
                           {c.address ? (
                             <div className="text-xs text-slate-500 dark:text-shark-400 flex items-center gap-1 mt-1 truncate" title={c.address}>
@@ -3970,18 +4197,45 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                      {customerSearchTerm ? 'No customers matching search' : 'No customers registered yet'}
+                      {customerSearchTerm
+                        ? `No clients matching "${customerSearchTerm}"`
+                        : customerFilterTab === 'ACTIVE'
+                        ? 'No clients with active loans'
+                        : customerFilterTab === 'SETTLED'
+                        ? 'No clients with settled loans'
+                        : 'No clients registered yet'}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-shark-400 mt-1 max-w-sm mx-auto">
-                      Add a customer profile with their photo and residential address to track their loans and credit status.
+                      {customerSearchTerm
+                        ? 'Try searching with another name, phone number, or address.'
+                        : customerFilterTab === 'ACTIVE'
+                        ? 'All registered borrowers have settled their loans or are currently inactive.'
+                        : customerFilterTab === 'SETTLED'
+                        ? 'Borrowers with closed/repaid loan records will appear here.'
+                        : 'Add a customer profile with their photo and residential address to track their loans.'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleOpenNewCustomerModal}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-money-600 hover:bg-money-500 text-white rounded-xl text-sm font-semibold shadow-md transition-colors"
-                  >
-                    <Icons.UserPlus /> <span>Add First Customer</span>
-                  </button>
+                  <div className="flex items-center justify-center gap-3">
+                    {(customerSearchTerm || customerFilterTab !== 'ALL') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerSearchTerm('');
+                          setCustomerFilterTab('ALL');
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-shark-700 hover:bg-slate-200 dark:hover:bg-shark-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+                      >
+                        <span>Reset Filters</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleOpenNewCustomerModal}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-money-600 hover:bg-money-500 text-white rounded-xl text-sm font-semibold shadow-md transition-colors cursor-pointer"
+                    >
+                      <Icons.UserPlus /> <span>New Client Profile</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -4739,6 +4993,42 @@ export default function App() {
                       <Icons.Lightbulb />
                       <span>Launch Interactive Tour</span>
                     </button>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
+
+                {/* AUTO-REMOVE INACTIVE CLIENTS */}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-money-500"><Icons.Clock /></span>
+                        <h3 className="font-bold text-slate-900 dark:text-white">Auto-Remove Inactive Clients (6 Months)</h3>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
+                        Automatically archive clients with no active loans and no loan or repayment activity for over 6 months into the 30-Day Recovery Vault. Keeps your client list fresh and organized.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTempSettings({ ...tempSettings, autoRemoveInactiveClients: !tempSettings.autoRemoveInactiveClients })}
+                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${tempSettings.autoRemoveInactiveClients ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.autoRemoveInactiveClients ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 text-xs text-slate-500 dark:text-shark-400">
+                    {tempSettings.autoRemoveInactiveClients ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                        ✓ Active: Inactive borrower profiles will automatically be archived to your 30-Day Recovery Vault. They can be restored with 1 click anytime.
+                      </span>
+                    ) : (
+                      <span>
+                        Off: Clients permanently remain in your database even after all their loans are repaid until you choose to remove them.
+                      </span>
+                    )}
                   </div>
                 </div>
 

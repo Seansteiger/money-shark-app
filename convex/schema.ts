@@ -12,6 +12,9 @@ export default defineSchema({
     globalCompoundMonthly: v.boolean(),
     isBiometricLockEnabled: v.optional(v.boolean()),
     showHints: v.optional(v.boolean()),
+    autoRemoveInactiveClients: v.optional(v.boolean()),
+    loanSortBy: v.optional(v.string()),
+    clientSortBy: v.optional(v.string()),
   }).index("by_userId", ["userId"]),
 
   customers: defineTable({

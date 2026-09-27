@@ -185,3 +185,94 @@ export const deleteCustomer = mutation({
     return { success: true };
   },
 });
+
+export const cleanupInactiveClients = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!settings || !settings.autoRemoveInactiveClients) {
+      return { archivedCount: 0 };
+    }
+
+    const SIX_MONTHS_MS = 180 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const customers = await ctx.db
+      .query("customers")
+      .withIndex("by_userId_name", (q) => q.eq("userId", userId))
+      .collect();
+
+    const activeCustomers = customers.filter((c) => !c.isDeleted);
+
+    const loans = await ctx.db
+      .query("loans")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
+    const repayments = await ctx.db
+      .query("repayments")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
+    let archivedCount = 0;
+
+    for (const customer of activeCustomers) {
+      const customerLoans = loans.filter((l) => l.customerId === customer._id && !l.isDeleted);
+      const hasActiveLoans = customerLoans.some((l) => l.status === "ACTIVE");
+
+      // Only archive if they have ZERO active loans
+      if (hasActiveLoans) {
+        continue;
+      }
+
+      // Determine latest activity timestamp
+      let latestActivity = customer._creationTime;
+
+      for (const loan of customerLoans) {
+        const loanStart = new Date(loan.startDate).getTime();
+        if (!isNaN(loanStart) && loanStart > latestActivity) {
+          latestActivity = loanStart;
+        }
+      }
+
+      const customerRepayments = repayments.filter((r) => r.customerId === customer._id && !r.isDeleted);
+      for (const rep of customerRepayments) {
+        const repTime = new Date(rep.paymentDate).getTime();
+        if (!isNaN(repTime) && repTime > latestActivity) {
+          latestActivity = repTime;
+        }
+      }
+
+      // Check if inactive for > 6 months
+      if (now - latestActivity > SIX_MONTHS_MS) {
+        // Soft delete customer to 30-day recovery vault
+        await ctx.db.patch(customer._id, {
+          isDeleted: true,
+          deletedAt: now,
+        });
+
+        // Also soft delete their closed loans so they appear in recovery vault
+        for (const loan of customerLoans) {
+          await ctx.db.patch(loan._id, {
+            isDeleted: true,
+            deletedAt: now,
+          });
+        }
+
+        archivedCount++;
+      }
+    }
+
+    return { archivedCount };
+  },
+});
+

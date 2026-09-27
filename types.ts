@@ -42,6 +42,9 @@ export interface AppSettings {
   globalCompoundMonthly: boolean;
   isBiometricLockEnabled?: boolean;
   showHints?: boolean;
+  autoRemoveInactiveClients?: boolean;
+  loanSortBy?: 'BALANCE_DESC' | 'DUE_SOONEST' | 'NEWEST' | 'NAME' | string;
+  clientSortBy?: 'NAME_ASC' | 'NAME_DESC' | 'ACTIVE_FIRST' | 'DEBT_DESC' | string;
 }
 
 export interface TrashLoan {
