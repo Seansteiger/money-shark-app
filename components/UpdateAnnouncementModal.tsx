@@ -1,14 +1,59 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface UpdateAnnouncementModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+interface UpdateItem {
+  id: string;
+  icon: string;
+  title: string;
+  shortSummary: string;
+  details: string;
+}
+
+const UPDATES: UpdateItem[] = [
+  {
+    id: 'closed-loan',
+    icon: '➕',
+    title: 'Add Loan from Closed Records',
+    shortSummary: 'Re-lend to past borrowers with 1 click',
+    details:
+      'When a returning client comes back after full repayment, tap "Add Loan" directly on their closed record card. The new loan is created under their existing profile without re-entering their details.',
+  },
+  {
+    id: 'client-list',
+    icon: '👥',
+    title: 'Dedicated Client List',
+    shortSummary: 'Client profiles stay saved permanently',
+    details:
+      'Borrower profiles now stay permanently stored in your database even after loans are 100% repaid. Quickly filter between All, Active, and Fully Repaid clients in the side menu.',
+  },
+  {
+    id: 'inactivity-vault',
+    icon: '🛡️',
+    title: '6-Month Inactivity Archive',
+    shortSummary: 'Optional auto-cleanup in Settings',
+    details:
+      'In Settings, you can optionally enable auto-removal for clients with 0 active loans and no activity for >6 months. Records safely move to the 30-Day Recovery Vault (turned OFF by default).',
+  },
+  {
+    id: 'sort-persistence',
+    icon: '🔀',
+    title: 'Permanent Sorting Preferences',
+    shortSummary: 'Arrangement stays saved across refreshes',
+    details:
+      'Your sorting choices for loans (Highest Balance, Soonest, Newest, A–Z) and clients now stay saved permanently on your device and cloud account.',
+  },
+];
+
 export const UpdateAnnouncementModal: React.FC<UpdateAnnouncementModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -20,129 +65,114 @@ export const UpdateAnnouncementModal: React.FC<UpdateAnnouncementModalProps> = (
 
   if (!isOpen) return null;
 
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-[2px] animate-in fade-in duration-200"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="update-announcement-title"
+      aria-labelledby="update-summary-title"
     >
+      {/* Compact Pop Up Window (max-w-sm) */}
       <div
-        className="relative w-full max-w-lg bg-white dark:bg-shark-900 rounded-3xl border border-slate-200 dark:border-shark-750 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-sm bg-white dark:bg-shark-900 rounded-2xl border border-slate-200 dark:border-shark-750 shadow-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Accent Strip */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-money-500 to-teal-400" />
+        {/* Subtle Top Emerald Line */}
+        <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-money-500 to-teal-400" />
 
-        {/* Modal Header */}
-        <div className="p-5 sm:p-6 pb-3 flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-money-500/10 text-money-600 dark:text-money-400 border border-money-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-money-500 animate-pulse" />
-              <span>New Features & Updates</span>
+        {/* Compact Header */}
+        <div className="px-4 py-3 border-b border-slate-100 dark:border-shark-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">✨</span>
+            <div>
+              <h3 id="update-summary-title" className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                Updates Summary
+              </h3>
+              <p className="text-[10px] text-slate-400 dark:text-shark-500">
+                Tap any bullet point to read details
+              </p>
             </div>
-            <h3
-              id="update-announcement-title"
-              className="text-xl font-bold text-slate-900 dark:text-white"
-            >
-              What's New in Money-Shark
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-shark-400">
-              Here is a quick summary of what was updated. You can dismiss this anytime.
-            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors cursor-pointer shrink-0"
-            aria-label="Close announcement"
-            title="Dismiss announcement"
+            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors cursor-pointer"
+            aria-label="Close"
+            title="Dismiss"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Updates Body */}
-        <div className="px-5 sm:px-6 py-2 overflow-y-auto space-y-3">
-          {/* Update 1 */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-shark-850 border border-slate-100 dark:border-shark-750 flex items-start gap-3.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 text-base font-bold">
-              ➕
-            </div>
-            <div className="space-y-0.5">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Add Loan from Closed Records
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-shark-300 leading-relaxed">
-                When a returning client comes back after full repayment, click <strong>"Add Loan"</strong> directly on their closed record card—no need to create a new profile from scratch.
-              </p>
-            </div>
-          </div>
+        {/* Expandable Bullet Points */}
+        <div className="p-3 space-y-1.5 max-h-[60vh] overflow-y-auto">
+          {UPDATES.map((item) => {
+            const isExpanded = expandedId === item.id;
+            return (
+              <div
+                key={item.id}
+                className="rounded-xl border border-slate-100 dark:border-shark-800/80 bg-slate-50/70 dark:bg-shark-850/60 overflow-hidden transition-all"
+              >
+                {/* Bullet Point Header / Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(item.id)}
+                  className="w-full px-3 py-2 text-left flex items-center justify-between gap-2.5 hover:bg-slate-100/60 dark:hover:bg-shark-800/80 transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs shrink-0 select-none">{item.icon}</span>
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-money-600 dark:group-hover:text-money-400">
+                      {item.title}
+                    </span>
+                  </div>
 
-          {/* Update 2 */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-shark-850 border border-slate-100 dark:border-shark-750 flex items-start gap-3.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 text-base font-bold">
-              👥
-            </div>
-            <div className="space-y-0.5">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Dedicated Client List
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-shark-300 leading-relaxed">
-                Borrower profiles now stay permanently saved in your database even after loans are repaid. Switch between <strong>All</strong>, <strong>Active</strong>, and <strong>Fully Repaid</strong> tabs anytime.
-              </p>
-            </div>
-          </div>
+                  <div className="flex items-center gap-1 shrink-0 text-slate-400 dark:text-shark-500">
+                    <span className="text-[10px] hidden sm:inline text-slate-400">
+                      {isExpanded ? 'Less' : 'More'}
+                    </span>
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                        isExpanded ? 'rotate-180 text-money-500' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
 
-          {/* Update 3 */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-shark-850 border border-slate-100 dark:border-shark-750 flex items-start gap-3.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 text-base font-bold">
-              🛡️
-            </div>
-            <div className="space-y-0.5">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Optional 6-Month Inactivity Archive
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-shark-300 leading-relaxed">
-                In Settings, optionally turn on auto-removal for clients with 0 active loans and over 6 months without activity. Records move safely to your <strong>30-Day Recovery Vault</strong> (off by default).
-              </p>
-            </div>
-          </div>
-
-          {/* Update 4 */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-shark-850 border border-slate-100 dark:border-shark-700 flex items-start gap-3.5">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 text-base font-bold">
-              🔀
-            </div>
-            <div className="space-y-0.5">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Permanent Sorting Preferences
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-shark-300 leading-relaxed">
-                Your loan and client arrangement choices (Alphabetical, Highest Balance, Compounding Soonest, Newest) now stay saved permanently across page refreshes and logins.
-              </p>
-            </div>
-          </div>
+                {/* Expanded Details Section */}
+                {isExpanded && (
+                  <div className="px-3 pb-2.5 pt-0.5 text-[11px] text-slate-600 dark:text-shark-300 leading-relaxed border-t border-slate-100 dark:border-shark-800/60 animate-in fade-in duration-150">
+                    <p>{item.details}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-5 sm:p-6 pt-4 border-t border-slate-100 dark:border-shark-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-shark-900/50">
-          <span className="text-[11px] text-slate-400 dark:text-shark-500">
-            Active for next 24 hours
+        {/* Compact Footer */}
+        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-shark-800 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-shark-950/40">
+          <span className="text-[10px] text-slate-400 dark:text-shark-500">
+            Active for next 24h
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-900 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-emerald-950/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-900 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
           >
-            <span>Got it, let's work</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+            Got it
           </button>
         </div>
       </div>
