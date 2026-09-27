@@ -48,6 +48,7 @@ import { exportPortfolioToCsv } from './utils/exportCsv';
 
 // Icons
 const Icons = {
+  Bell: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>,
   Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>,
   Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
   Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>,
@@ -244,6 +245,7 @@ export default function App() {
   const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings' | 'trash'>('dashboard');
   const [entryMode, setEntryMode] = useState<'manual' | 'scan'>('manual');
   const [showUpdateAnnouncement, setShowUpdateAnnouncement] = useState(false);
+  const [showUpdateNotificationBanner, setShowUpdateNotificationBanner] = useState(false);
 
   // Theme & Menu State
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -432,13 +434,37 @@ export default function App() {
         const savedClientSort = (await getClientSortPreference()) || localStorage.getItem('ms_preference_client_sort');
         if (savedClientSort && isMounted) setCustomerSortBy(savedClientSort as any);
 
-        // Check 24-Hour Update Announcement (Show only on first app open within 24 hours)
+        // Check 24-Hour Update Announcement & Notification
         const now = Date.now();
         const isWithin24Hours = now >= UPDATE_ANNOUNCEMENT_START && now <= (UPDATE_ANNOUNCEMENT_START + UPDATE_ANNOUNCEMENT_WINDOW);
         if (isWithin24Hours) {
           const hasSeen = (await getUpdateNoticeSeen(UPDATE_ANNOUNCEMENT_ID)) || (typeof localStorage !== 'undefined' && localStorage.getItem(`ms_update_seen_${UPDATE_ANNOUNCEMENT_ID}`) === 'true');
           if (!hasSeen && isMounted) {
             setShowUpdateAnnouncement(true);
+            setShowUpdateNotificationBanner(true);
+
+            // Send native browser notification if supported
+            if (typeof window !== 'undefined' && 'Notification' in window) {
+              if (Notification.permission === 'granted') {
+                try {
+                  new Notification("Updates Summary - Money-Shark", {
+                    body: "Add loan on closed records, persistent client list, and permanent sorting preferences.",
+                    icon: "/icons/icon-192x192.png",
+                  });
+                } catch {}
+              } else if (Notification.permission === 'default') {
+                try {
+                  Notification.requestPermission().then((perm) => {
+                    if (perm === 'granted') {
+                      new Notification("Updates Summary - Money-Shark", {
+                        body: "Add loan on closed records, persistent client list, and permanent sorting preferences.",
+                        icon: "/icons/icon-192x192.png",
+                      });
+                    }
+                  });
+                } catch {}
+              }
+            }
           }
         }
 
@@ -1062,7 +1088,12 @@ export default function App() {
 
   const handleDismissUpdateAnnouncement = () => {
     setShowUpdateAnnouncement(false);
+    setShowUpdateNotificationBanner(false);
     saveUpdateNoticeSeen(UPDATE_ANNOUNCEMENT_ID);
+  };
+
+  const handleDismissUpdateBanner = () => {
+    setShowUpdateNotificationBanner(false);
   };
 
   // --- Customer & Loan Helpers ---
@@ -2477,6 +2508,22 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {/* Updates Summary Quick Trigger & Notification Bell */}
+          <button
+            onClick={() => setShowUpdateAnnouncement(true)}
+            className="relative p-1.5 rounded-xl text-slate-500 hover:text-money-600 dark:hover:text-money-400 hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors cursor-pointer"
+            title="Updates Summary"
+            aria-label="View Updates Summary"
+          >
+            <Icons.Bell />
+            {showUpdateNotificationBanner && (
+              <>
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500" />
+              </>
+            )}
+          </button>
+
           {/* Interactive Guided Tour Quick Trigger */}
           <button
             onClick={() => {
@@ -3341,6 +3388,49 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 overflow-auto pt-16 pb-20 md:pb-6 relative">
         <div className="p-6 max-w-6xl mx-auto space-y-8">
+
+          {/* In-App Notification: Updates Summary */}
+          {showUpdateNotificationBanner && (
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-money-500/10 to-teal-500/15 border border-emerald-500/30 text-slate-800 dark:text-slate-100 flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/10 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-md shadow-emerald-600/30">
+                  🔔
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                      Updates Summary
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-semibold">
+                      New Features Live
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-shark-300 truncate sm:whitespace-normal">
+                    Add loan on closed records, persistent client list, and permanent sorting preferences are now active.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowUpdateAnnouncement(true)}
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                >
+                  View Details
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissUpdateBanner}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Dismiss notification"
+                  aria-label="Dismiss notification"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* VIEW: DASHBOARD */}
           {view === 'dashboard' && (
