@@ -43,6 +43,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { PortfolioAnalytics } from './components/PortfolioAnalytics';
 import { DuplicateCustomerModal } from './components/DuplicateCustomerModal';
 import { UpdateAnnouncementModal } from './components/UpdateAnnouncementModal';
+import { ToggleSwitch } from './components/ToggleSwitch';
 import { exportPortfolioToCsv } from './utils/exportCsv';
 
 
@@ -2653,26 +2654,29 @@ export default function App() {
             <h3 className="px-3 mb-3 text-xs font-bold text-slate-400 dark:text-shark-500 uppercase">Input Preferences</h3>
             <div className="space-y-2">
               {/* Use Fixed Rates Toggle - Moved here from Form */}
-              <button
+              <div
                 onClick={() => setFormData(prev => ({ ...prev, isFixedRate: !prev.isFixedRate }))}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${formData.isFixedRate
+                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none ${formData.isFixedRate
                   ? 'bg-money-50 dark:bg-money-900/10 border-money-200 dark:border-money-900/30'
                   : 'bg-slate-50 dark:bg-shark-800 border-slate-200 dark:border-shark-700'
                   }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={formData.isFixedRate ? 'text-money-600 dark:text-money-500' : 'text-slate-400'}>
+                <div className="flex items-center gap-3 min-w-0 pr-2">
+                  <div className={formData.isFixedRate ? 'text-money-600 dark:text-money-500 shrink-0' : 'text-slate-400 shrink-0'}>
                     {formData.isFixedRate ? <Icons.Lock /> : <Icons.Unlock />}
                   </div>
-                  <div className="text-left">
-                    <div className={`text-sm font-medium ${formData.isFixedRate ? 'text-money-700 dark:text-money-400' : 'text-slate-600 dark:text-shark-300'}`}>Use Fixed Rates</div>
-                    <div className="text-[10px] text-slate-400 dark:text-shark-500">Lock entry inputs to global defaults</div>
+                  <div className="text-left min-w-0">
+                    <div className={`text-sm font-medium truncate ${formData.isFixedRate ? 'text-money-700 dark:text-money-400' : 'text-slate-600 dark:text-shark-300'}`}>Use Fixed Rates</div>
+                    <div className="text-[10px] text-slate-400 dark:text-shark-500 truncate">Lock entry inputs to global defaults</div>
                   </div>
                 </div>
-                <div className="w-10 h-5 rounded-full relative transition-colors bg-slate-300 dark:bg-shark-600" style={{ backgroundColor: formData.isFixedRate ? 'var(--money-600, #10b981)' : '' }}>
-                  <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${formData.isFixedRate ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                </div>
-              </button>
+                <ToggleSwitch
+                  checked={Boolean(formData.isFixedRate)}
+                  onChange={(val) => setFormData(prev => ({ ...prev, isFixedRate: val }))}
+                  size="sm"
+                  label="Use fixed rates"
+                />
+              </div>
 
               {/* Theme Toggle in Menu */}
               <button
@@ -5011,44 +5015,50 @@ export default function App() {
 
           {/* VIEW: SETTINGS */}
           {view === 'settings' && (
-            <div className="max-w-2xl">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Global Configuration</h2>
+            <div className="max-w-2xl mx-auto space-y-6 pb-12">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Global Configuration</h2>
+                <p className="text-xs text-slate-500 dark:text-shark-400 mt-1">
+                  Customize default interest rates, interactive guidance, client maintenance, and security.
+                </p>
+              </div>
+
               <div className="bg-white dark:bg-shark-800 rounded-2xl border border-slate-200 dark:border-shark-700 p-6 space-y-6 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors duration-300">
 
                 {/* Interest Rate Settings */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-slate-900 dark:text-white">Default Initial Interest</h3>
-                    <p className="text-sm text-slate-500 dark:text-shark-400">The immediate markup applied (e.g., 50% = 500 becomes 750).</p>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Default Initial Interest</h3>
+                    <p className="text-sm text-slate-500 dark:text-shark-400 mt-0.5">The immediate markup applied (e.g., 50% = 500 becomes 750).</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <input
                       type="number"
                       step="0.01"
                       value={tempSettings.globalInitialInterestRate}
                       onChange={(e) => setTempSettings({ ...tempSettings, globalInitialInterestRate: parseFloat(e.target.value) })}
-                      className="bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 text-slate-900 dark:text-white rounded-lg p-2 w-24 text-right font-mono transition-colors focus:border-money-500 outline-none"
+                      className="bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 text-slate-900 dark:text-white rounded-xl p-2 w-20 sm:w-24 text-right font-mono transition-colors focus:border-money-500 focus:ring-2 focus:ring-money-500/20 outline-none"
                     />
-                    <span className="text-slate-500 dark:text-shark-400">%</span>
+                    <span className="text-slate-500 dark:text-shark-400 font-semibold">%</span>
                   </div>
                 </div>
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-slate-900 dark:text-white">Default Monthly Compounding</h3>
-                    <p className="text-sm text-slate-500 dark:text-shark-400">The rate applied every 30 days after the first month.</p>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Default Monthly Compounding</h3>
+                    <p className="text-sm text-slate-500 dark:text-shark-400 mt-0.5">The rate applied every 30 days after the first month.</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <input
                       type="number"
                       step="0.01"
                       value={tempSettings.globalInterestRate}
                       onChange={(e) => setTempSettings({ ...tempSettings, globalInterestRate: parseFloat(e.target.value) })}
-                      className="bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 text-slate-900 dark:text-white rounded-lg p-2 w-24 text-right font-mono transition-colors focus:border-money-500 outline-none"
+                      className="bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 text-slate-900 dark:text-white rounded-xl p-2 w-20 sm:w-24 text-right font-mono transition-colors focus:border-money-500 focus:ring-2 focus:ring-money-500/20 outline-none"
                     />
-                    <span className="text-slate-500 dark:text-shark-400">%</span>
+                    <span className="text-slate-500 dark:text-shark-400 font-semibold">%</span>
                   </div>
                 </div>
 
@@ -5074,44 +5084,42 @@ export default function App() {
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-slate-900 dark:text-white">Compound Interest Mode</h3>
-                    <p className="text-sm text-slate-500 dark:text-shark-400">If disabled, simple interest will be used by default.</p>
+                {/* COMPOUND INTEREST MODE */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Compound Interest Mode</h3>
+                    <p className="text-sm text-slate-500 dark:text-shark-400 mt-0.5">If disabled, simple interest will be used by default.</p>
                   </div>
-                  <button
-                    onClick={() => setTempSettings({ ...tempSettings, globalCompoundMonthly: !tempSettings.globalCompoundMonthly })}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${tempSettings.globalCompoundMonthly ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
-                  >
-                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.globalCompoundMonthly ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                  </button>
+                  <ToggleSwitch
+                    checked={Boolean(tempSettings.globalCompoundMonthly)}
+                    onChange={(val) => setTempSettings({ ...tempSettings, globalCompoundMonthly: val })}
+                    label="Compound interest mode"
+                  />
                 </div>
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
 
                 {/* INTERACTIVE GUIDANCE & HINTS */}
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-money-500"><Icons.Lightbulb /></span>
-                        <h3 className="font-bold text-slate-900 dark:text-white">Interactive Setup Hints & Guidance</h3>
+                        <span className="text-money-500 shrink-0"><Icons.Lightbulb /></span>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Interactive Setup Hints & Guidance</h3>
                       </div>
                       <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
                         Display helpful setup reminders, rate hints, and feature tooltips throughout the app.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setTempSettings({ ...tempSettings, showHints: tempSettings.showHints === false ? true : false })}
-                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${tempSettings.showHints !== false ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
-                    >
-                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.showHints !== false ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </button>
+                    <ToggleSwitch
+                      checked={tempSettings.showHints !== false}
+                      onChange={(val) => setTempSettings({ ...tempSettings, showHints: val })}
+                      label="Interactive setup hints and guidance"
+                    />
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-200 dark:border-shark-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                     <div className="text-slate-600 dark:text-shark-300">
                       Need a complete interactive walkthrough of rates, customers, AI receipts, and security?
                     </div>
@@ -5121,7 +5129,7 @@ export default function App() {
                         setWalkthroughStep(0);
                         setShowWalkthroughModal(true);
                       }}
-                      className="px-3.5 py-2 rounded-lg bg-money-600 hover:bg-money-500 text-white font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-money-600 hover:bg-money-500 active:bg-money-700 text-white font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm shrink-0 active:scale-95"
                     >
                       <Icons.Lightbulb />
                       <span>Launch Interactive Tour</span>
@@ -5133,29 +5141,27 @@ export default function App() {
 
                 {/* AUTO-REMOVE INACTIVE CLIENTS */}
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-money-500"><Icons.Clock /></span>
-                        <h3 className="font-bold text-slate-900 dark:text-white">Auto-Remove Inactive Clients (6 Months)</h3>
+                        <span className="text-money-500 shrink-0"><Icons.Clock /></span>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Auto-Remove Inactive Clients (6 Months)</h3>
                       </div>
                       <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
                         Automatically archive clients with no active loans and no loan or repayment activity for over 6 months into the 30-Day Recovery Vault. Keeps your client list fresh and organized.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setTempSettings({ ...tempSettings, autoRemoveInactiveClients: !tempSettings.autoRemoveInactiveClients })}
-                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${tempSettings.autoRemoveInactiveClients ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
-                    >
-                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.autoRemoveInactiveClients ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </button>
+                    <ToggleSwitch
+                      checked={Boolean(tempSettings.autoRemoveInactiveClients)}
+                      onChange={(val) => setTempSettings({ ...tempSettings, autoRemoveInactiveClients: val })}
+                      label="Auto-remove inactive clients"
+                    />
                   </div>
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 text-xs text-slate-500 dark:text-shark-400">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-200 dark:border-shark-700/80 text-xs text-slate-500 dark:text-shark-400">
                     {tempSettings.autoRemoveInactiveClients ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                        ✓ Active: Inactive borrower profiles will automatically be archived to your 30-Day Recovery Vault. They can be restored with 1 click anytime.
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                        <span>✓</span> Active: Inactive borrower profiles will automatically be archived to your 30-Day Recovery Vault. They can be restored with 1 click anytime.
                       </span>
                     ) : (
                       <span>
@@ -5169,11 +5175,11 @@ export default function App() {
 
                 {/* 30-DAY CLOUD DATA RECOVERY VAULT CARD */}
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-amber-500"><Icons.Shield /></span>
-                        <h3 className="font-bold text-slate-900 dark:text-white">30-Day Cloud Data Recovery Vault</h3>
+                        <span className="text-amber-500 shrink-0"><Icons.Shield /></span>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">30-Day Cloud Data Recovery Vault</h3>
                       </div>
                       <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
                         Zero data loss protection: All deleted loans and client records are stored safely for 30 days.
@@ -5185,7 +5191,7 @@ export default function App() {
                     </span>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-200 dark:border-shark-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-slate-700 dark:text-slate-300">
                         {trashData && trashData.totalCount > 0
@@ -5197,7 +5203,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setView('trash')}
-                      className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm shrink-0 active:scale-95"
                     >
                       <Icons.Archive />
                       <span>Open Recovery Vault ({trashData?.totalCount || 0})</span>
@@ -5209,28 +5215,26 @@ export default function App() {
 
                 {/* BIOMETRIC & PASSKEY SECURITY CARD */}
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-money-500"><Icons.Fingerprint /></span>
-                        <h3 className="font-bold text-slate-900 dark:text-white">Biometric Passkey & App Shield</h3>
+                        <span className="text-money-500 shrink-0"><Icons.Fingerprint /></span>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Biometric Passkey & App Shield</h3>
                       </div>
                       <p className="text-sm text-slate-500 dark:text-shark-400 mt-1">
                         Lock the application with hardware-backed Face ID, Touch ID, or Windows Hello.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setTempSettings({ ...tempSettings, isBiometricLockEnabled: !tempSettings.isBiometricLockEnabled })}
-                      className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${tempSettings.isBiometricLockEnabled ? 'bg-money-600' : 'bg-slate-300 dark:bg-shark-600'}`}
-                    >
-                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${tempSettings.isBiometricLockEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </button>
+                    <ToggleSwitch
+                      checked={Boolean(tempSettings.isBiometricLockEnabled)}
+                      onChange={(val) => setTempSettings({ ...tempSettings, isBiometricLockEnabled: val })}
+                      label="Biometric passkey and app shield"
+                    />
                   </div>
 
                   {/* Device Biometrics Status */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-200 dark:border-shark-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-2.5 rounded-full ${isDeviceBiometricAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
                       <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -5242,7 +5246,7 @@ export default function App() {
                       type="button"
                       onClick={handleRegisterDevicePasskey}
                       disabled={isRegisteringPasskey}
-                      className="px-3.5 py-2 rounded-lg bg-money-600 hover:bg-money-500 disabled:opacity-50 text-white font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-money-600 hover:bg-money-500 active:bg-money-700 disabled:opacity-50 text-white font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm shrink-0 active:scale-95"
                     >
                       {isRegisteringPasskey ? (
                         <span className="animate-spin"><Icons.Refresh /></span>
@@ -5303,8 +5307,9 @@ export default function App() {
 
                 <div className="flex justify-end pt-2">
                   <button
+                    type="button"
                     onClick={handleSaveSettings}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white transition-all shadow-lg ${settingsSuccess ? 'bg-green-600 shadow-green-900/30' : 'bg-money-600 hover:bg-money-500 shadow-money-900/30'}`}
+                    className={`w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-xl font-bold text-white transition-all shadow-lg active:scale-95 cursor-pointer ${settingsSuccess ? 'bg-green-600 shadow-green-900/30' : 'bg-money-600 hover:bg-money-500 shadow-money-900/30'}`}
                   >
                     {settingsSuccess ? <Icons.Check /> : <Icons.Save />}
                     <span>{settingsSuccess ? 'Settings Saved!' : 'Save Changes'}</span>
@@ -5312,14 +5317,15 @@ export default function App() {
                 </div>
 
                 <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl p-5 mt-8">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                      <h3 className="font-medium text-red-600 dark:text-red-400">Danger Zone</h3>
-                      <p className="text-sm text-slate-500 dark:text-shark-400">Reset all application data to default state.</p>
+                      <h3 className="font-bold text-red-600 dark:text-red-400">Danger Zone</h3>
+                      <p className="text-sm text-slate-500 dark:text-shark-400 mt-0.5">Reset all application data to default state.</p>
                     </div>
                     <button
+                      type="button"
                       onClick={handleResetRequest}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50 transition-colors"
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50 transition-colors cursor-pointer shrink-0 font-semibold text-xs active:scale-95"
                     >
                       <Icons.Refresh />
                       <span>Reset Data</span>
