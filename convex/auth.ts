@@ -22,6 +22,74 @@ export const ResendEmail = Email({
       throw new Error("AUTH_RESEND_KEY is not configured");
     }
 
+    const textBody = `Your Money-Shark verification code is: ${token}\n\nThis code is valid for 15 minutes.\n\nOr click here to sign in directly:\n${url}\n\nIf you did not request this verification, you can safely ignore this email.\n\nMoney-Shark Capital Management • steigeronline.co.za`;
+
+    const htmlBody = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${token} is your Money-Shark verification code</title>
+</head>
+<body style="margin:0;padding:24px 12px;background-color:#0B0F19;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <!-- Preheader text to optimize inbox preview -->
+  <div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;mso-hide:all;">
+    Your Money-Shark verification code is ${token}. Valid for 15 minutes.
+  </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:480px;margin:0 auto;background:#131B2E;border-radius:18px;overflow:hidden;border:1px solid #1E293B;box-shadow:0 12px 36px rgba(0,0,0,0.4);">
+    <tr>
+      <td style="padding:32px 28px 24px 28px;text-align:center;">
+        <h1 style="margin:0;font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#FFFFFF;">
+          <span style="color:#10B981;">Money</span>-Shark
+        </h1>
+        <p style="margin:6px 0 0 0;font-size:12px;font-weight:600;color:#94A3B8;letter-spacing:1px;text-transform:uppercase;">
+          Capital Management Security
+        </p>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding:0 28px 24px 28px;">
+        <div style="background:#1E293B;border:1px solid #334155;border-radius:14px;padding:24px;text-align:center;">
+          <p style="margin:0 0 8px 0;font-size:13px;color:#94A3B8;font-weight:500;">
+            Your sign-in verification code
+          </p>
+          <div style="font-size:38px;font-weight:800;letter-spacing:8px;color:#34D399;font-family:'Courier New',Courier,monospace;margin:12px 0;">
+            ${token}
+          </div>
+          <p style="margin:8px 0 0 0;font-size:12px;color:#64748B;">
+            Expires in 15 minutes
+          </p>
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding:0 28px 28px 28px;text-align:center;">
+        <p style="margin:0 0 14px 0;font-size:13px;color:#94A3B8;">
+          Or verify instantly with 1 click:
+        </p>
+        <a href="${url}" style="display:inline-block;background:#10B981;color:#FFFFFF;padding:13px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;box-shadow:0 4px 12px rgba(16,185,129,0.35);">
+          Verify &amp; Sign In &rarr;
+        </a>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding:20px 28px;border-top:1px solid #1E293B;background:#0F172A;text-align:center;">
+        <p style="margin:0 0 6px 0;font-size:11px;color:#64748B;">
+          If you didn't request this code, you can safely ignore this email.
+        </p>
+        <p style="margin:0;font-size:10px;color:#475569;">
+          Money-Shark Capital Management &bull; <a href="https://steigeronline.co.za" style="color:#64748B;text-decoration:underline;">steigeronline.co.za</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -31,36 +99,13 @@ export const ResendEmail = Email({
       body: JSON.stringify({
         from: "Money Shark <auth@steigeronline.co.za>",
         to: email,
-        subject: `Your Money Shark Verification Code: ${token}`,
-        html: `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0F172A;color:#E2E8F0;padding:36px 24px;border-radius:16px;max-width:500px;margin:0 auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-            <div style="text-align:center;margin-bottom:28px;">
-              <h1 style="color:#FFFFFF;margin:0;font-size:24px;letter-spacing:-0.5px;">
-                <span style="color:#10B981;">Money</span>-Shark
-              </h1>
-              <p style="color:#94A3B8;font-size:12px;margin-top:6px;letter-spacing:1px;text-transform:uppercase;">Email Verification Required</p>
-            </div>
-
-            <div style="background:#1E293B;padding:24px;border-radius:12px;text-align:center;border:1px solid #334155;margin-bottom:24px;">
-              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Option 1: Enter your 6-digit verification code</p>
-              <div style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#34D399;margin:12px 0;font-family:monospace;">${token}</div>
-              <p style="color:#64748B;font-size:11px;margin:8px 0 0 0;">Valid for 15 minutes.</p>
-            </div>
-
-            <div style="text-align:center;margin-bottom:24px;">
-              <p style="color:#94A3B8;font-size:13px;margin:0 0 12px 0;">Option 2: 1-Click Instant Verification</p>
-              <a href="${url}" style="display:inline-block;background:#10B981;color:#FFFFFF;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px;box-shadow:0 4px 14px rgba(16,185,129,0.4);">
-                Verify & Sign In Directly →
-              </a>
-            </div>
-
-            <div style="border-top:1px solid #334155;padding-top:16px;text-align:center;">
-              <p style="color:#64748B;font-size:11px;margin:0;">
-                If you did not request this email, you can safely ignore it.
-              </p>
-            </div>
-          </div>
-        `,
+        reply_to: "support@steigeronline.co.za",
+        subject: `${token} is your Money-Shark verification code`,
+        text: textBody,
+        html: htmlBody,
+        headers: {
+          "X-Entity-Ref-ID": token,
+        },
       }),
     });
 
