@@ -35,11 +35,14 @@ import {
   getLoanSortPreference,
   saveClientSortPreference,
   getClientSortPreference,
+  saveUpdateNoticeSeen,
+  getUpdateNoticeSeen,
 } from './utils/storage';
 import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
 import { PaymentModal } from './components/PaymentModal';
 import { PortfolioAnalytics } from './components/PortfolioAnalytics';
 import { DuplicateCustomerModal } from './components/DuplicateCustomerModal';
+import { UpdateAnnouncementModal } from './components/UpdateAnnouncementModal';
 import { exportPortfolioToCsv } from './utils/exportCsv';
 
 
@@ -232,11 +235,15 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 
-// Data source is the local API backend.
+// 24-Hour Update Announcement Configuration
+const UPDATE_ANNOUNCEMENT_ID = '2026-09-27-features';
+const UPDATE_ANNOUNCEMENT_START = new Date('2026-09-27T17:00:00Z').getTime();
+const UPDATE_ANNOUNCEMENT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
 
 export default function App() {
   const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings' | 'trash'>('dashboard');
   const [entryMode, setEntryMode] = useState<'manual' | 'scan'>('manual');
+  const [showUpdateAnnouncement, setShowUpdateAnnouncement] = useState(false);
 
   // Theme & Menu State
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -424,6 +431,16 @@ export default function App() {
         if (savedSort && isMounted) setLoanSortBy(savedSort as any);
         const savedClientSort = (await getClientSortPreference()) || localStorage.getItem('ms_preference_client_sort');
         if (savedClientSort && isMounted) setCustomerSortBy(savedClientSort as any);
+
+        // Check 24-Hour Update Announcement (Show only on first app open within 24 hours)
+        const now = Date.now();
+        const isWithin24Hours = now >= UPDATE_ANNOUNCEMENT_START && now <= (UPDATE_ANNOUNCEMENT_START + UPDATE_ANNOUNCEMENT_WINDOW);
+        if (isWithin24Hours) {
+          const hasSeen = (await getUpdateNoticeSeen(UPDATE_ANNOUNCEMENT_ID)) || (typeof localStorage !== 'undefined' && localStorage.getItem(`ms_update_seen_${UPDATE_ANNOUNCEMENT_ID}`) === 'true');
+          if (!hasSeen && isMounted) {
+            setShowUpdateAnnouncement(true);
+          }
+        }
 
         // Hydrate Cached Snapshot
         const cached = await getCachedSnapshot();
@@ -1041,6 +1058,11 @@ export default function App() {
         clientSortBy: newSort,
       }).catch((e: any) => console.warn('Failed to save client sort pref to cloud:', e));
     }
+  };
+
+  const handleDismissUpdateAnnouncement = () => {
+    setShowUpdateAnnouncement(false);
+    saveUpdateNoticeSeen(UPDATE_ANNOUNCEMENT_ID);
   };
 
   // --- Customer & Loan Helpers ---
@@ -2537,6 +2559,27 @@ export default function App() {
           <div>
             <h3 className="px-3 mb-3 text-xs font-bold text-slate-400 dark:text-shark-500 uppercase">Assistance & Hints</h3>
             <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setShowUpdateAnnouncement(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-shark-800/80 hover:bg-slate-200/70 dark:hover:bg-shark-750 border border-slate-200 dark:border-shark-700 text-slate-750 dark:text-slate-200 transition-all text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-base">
+                    ✨
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">What's New (Updates)</div>
+                    <div className="text-[10px] text-slate-500 dark:text-shark-400">View recent updates & features</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-money-500/10 text-money-600 dark:text-money-400 font-bold border border-money-500/20">
+                  New
+                </span>
+              </button>
+
               <button
                 onClick={() => {
                   setIsMenuOpen(false);
@@ -5728,6 +5771,12 @@ export default function App() {
           handleSaveLoan({ forceNewCustomer: true });
         }}
         onClose={() => setDuplicateCustomerPrompt(null)}
+      />
+
+      {/* 24-HOUR NEW FEATURE ANNOUNCEMENT MODAL */}
+      <UpdateAnnouncementModal
+        isOpen={showUpdateAnnouncement}
+        onClose={handleDismissUpdateAnnouncement}
       />
     </div>
   );

@@ -225,6 +225,21 @@ export const getClientSortPreference = async (): Promise<string | null> => {
   return await deviceStorage.get<string>(KEYS.CLIENT_SORT);
 };
 
+export const saveUpdateNoticeSeen = async (updateId: string) => {
+  try {
+    localStorage.setItem(`ms_update_seen_${updateId}`, 'true');
+  } catch {}
+  await deviceStorage.set(`ms_update_seen_${updateId}`, true);
+};
+
+export const getUpdateNoticeSeen = async (updateId: string): Promise<boolean> => {
+  try {
+    if (localStorage.getItem(`ms_update_seen_${updateId}`) === 'true') return true;
+  } catch {}
+  const res = await deviceStorage.get<boolean>(`ms_update_seen_${updateId}`);
+  return Boolean(res);
+};
+
 export const clearAllDeviceStorage = async () => {
   await deviceStorage.clear();
 };
