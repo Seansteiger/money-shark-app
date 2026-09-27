@@ -163,10 +163,7 @@ export const UpdateAnnouncementModal: React.FC<UpdateAnnouncementModalProps> = (
         </div>
 
         {/* Compact Footer */}
-        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-shark-800 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-shark-950/40">
-          <span className="text-[10px] text-slate-400 dark:text-shark-500">
-            Active for next 24h
-          </span>
+        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-shark-800 flex items-center justify-end bg-slate-50/50 dark:bg-shark-950/40">
           <button
             type="button"
             onClick={onClose}
