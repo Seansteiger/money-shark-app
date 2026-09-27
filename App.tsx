@@ -578,6 +578,15 @@ export default function App() {
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const formAvatarFileInputRef = useRef<HTMLInputElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleNavigateHome = () => {
+    setView('dashboard');
+    setIsMenuOpen(false);
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // 3. Debounced Draft Auto-Save to IndexedDB
   useEffect(() => {
@@ -2499,14 +2508,22 @@ export default function App() {
 
       {/* HEADER - VISIBLE ALWAYS */}
       <header className="absolute top-0 left-0 right-0 h-16 bg-white dark:bg-shark-900 border-b border-slate-200 dark:border-shark-800 z-20 flex items-center justify-between px-4">
-        <div className="flex items-center gap-3">
-          <button onClick={toggleMenu} className="p-2 -ml-2 rounded-lg text-slate-600 dark:text-white hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button onClick={toggleMenu} className="p-2 -ml-2 rounded-lg text-slate-600 dark:text-white hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors cursor-pointer" aria-label="Open Navigation Menu">
             <Icons.Menu />
           </button>
-          <h1 className="text-xl font-bold tracking-tight">
-            <span className="text-money-600 dark:text-money-500">Money</span>
-            <span className="text-slate-900 dark:text-white">-Shark</span>
-          </h1>
+          <button
+            type="button"
+            onClick={handleNavigateHome}
+            className="flex items-center gap-1.5 px-1 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-shark-800/60 transition-all cursor-pointer group active:scale-95 text-left focus:outline-none focus:ring-2 focus:ring-money-500/30"
+            title="Money-Shark - Go to Home"
+            aria-label="Money-Shark Home"
+          >
+            <h1 className="text-xl font-bold tracking-tight select-none flex items-center">
+              <span className="text-money-600 dark:text-money-500 group-hover:brightness-110 transition-all">Money</span>
+              <span className="text-slate-900 dark:text-white">-Shark</span>
+            </h1>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {/* Updates Summary Quick Trigger & Notification Bell */}
@@ -2560,9 +2577,20 @@ export default function App() {
       <div
         className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-shark-900 border-r border-slate-200 dark:border-shark-800 z-50 transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="h-16 flex items-center px-4 border-b border-slate-200 dark:border-shark-800">
-          <h2 className="text-sm font-bold text-slate-400 dark:text-shark-500 uppercase tracking-widest">Navigation</h2>
-          <button onClick={toggleMenu} className="ml-auto p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-shark-800">
+          <button
+            type="button"
+            onClick={handleNavigateHome}
+            className="flex items-center gap-1.5 px-1 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-shark-800/60 transition-all cursor-pointer group active:scale-95 text-left focus:outline-none"
+            title="Money-Shark - Go to Home"
+            aria-label="Money-Shark Home"
+          >
+            <span className="text-lg font-bold tracking-tight select-none flex items-center">
+              <span className="text-money-600 dark:text-money-500 group-hover:brightness-110 transition-all">Money</span>
+              <span className="text-slate-900 dark:text-white">-Shark</span>
+            </span>
+          </button>
+          <button onClick={toggleMenu} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-shark-800 transition-colors cursor-pointer" aria-label="Close navigation menu">
             <Icons.X />
           </button>
         </div>
@@ -3390,7 +3418,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto pt-16 pb-20 md:pb-6 relative">
+      <div ref={mainScrollRef} className="flex-1 overflow-auto pt-16 pb-20 md:pb-6 relative">
         <div className="p-6 max-w-6xl mx-auto space-y-8">
 
           {/* In-App Notification: Updates Summary */}
