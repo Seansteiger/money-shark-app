@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { useQuery, useMutation } from 'convex/react';
 import { api } from './convex/_generated/api';
 
-import { Customer, Loan, InterestType, AppSettings, UserPasskey, Repayment } from './types';
+import { Customer, Loan, InterestType, AppSettings, UserPasskey, Repayment, Expense } from './types';
 import {
   isBiometricSupported,
   registerDevicePasskey,
@@ -21,6 +21,8 @@ import {
   seedDemoData,
   recordPayment,
   deletePayment as deletePaymentById,
+  createExpense,
+  deleteExpense as deleteExpenseById,
 } from './utils/api';
 import {
   saveCachedSnapshot,
@@ -43,6 +45,8 @@ import { PaymentModal } from './components/PaymentModal';
 import { PortfolioAnalytics } from './components/PortfolioAnalytics';
 import { DuplicateCustomerModal } from './components/DuplicateCustomerModal';
 import { UpdateAnnouncementModal } from './components/UpdateAnnouncementModal';
+import { MonthlyExpenditureView } from './components/MonthlyExpenditureView';
+import { ExpenseModal } from './components/ExpenseModal';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { exportPortfolioToCsv } from './utils/exportCsv';
 
@@ -243,7 +247,7 @@ const UPDATE_ANNOUNCEMENT_START = new Date('2026-09-27T17:00:00Z').getTime();
 const UPDATE_ANNOUNCEMENT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
 
 export default function App() {
-  const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings' | 'trash'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'loans' | 'entry' | 'settings' | 'trash' | 'monthly'>('dashboard');
   const [entryMode, setEntryMode] = useState<'manual' | 'scan'>('manual');
   const [showUpdateAnnouncement, setShowUpdateAnnouncement] = useState(false);
   const [showUpdateNotificationBanner, setShowUpdateNotificationBanner] = useState(false);
@@ -298,6 +302,9 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [repayments, setRepayments] = useState<Repayment[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseModalInitialDate, setExpenseModalInitialDate] = useState<string | undefined>(undefined);
   const [paymentModalLoan, setPaymentModalLoan] = useState<Loan | null>(null);
   const [loanFilterTab, setLoanFilterTab] = useState<'ALL' | 'GRACE' | 'COMPOUNDING' | 'OVERDUE'>('ALL');
   const [loanSortBy, setLoanSortBy] = useState<'BALANCE_DESC' | 'DUE_SOONEST' | 'NEWEST' | 'NAME'>('BALANCE_DESC');
@@ -480,6 +487,7 @@ export default function App() {
           if (cached.customers?.length) setCustomers(cached.customers);
           if (cached.loans?.length) setLoans(cached.loans);
           if (cached.repayments?.length) setRepayments(cached.repayments);
+          if (cached.expenses?.length) setExpenses(cached.expenses);
           setLoading(false);
         }
 
@@ -519,6 +527,8 @@ export default function App() {
       setLoans(liveData.loans as any[]);
       const liveRepayments = (liveData as any).repayments || [];
       setRepayments(liveRepayments);
+      const liveExpenses = (liveData as any).expenses || [];
+      setExpenses(liveExpenses);
       setLoading(false);
 
       // Cache snapshot to on-device IndexedDB
@@ -527,6 +537,7 @@ export default function App() {
         customers: liveData.customers,
         loans: liveData.loans as any[],
         repayments: liveRepayments,
+        expenses: liveExpenses,
       }).catch((e) => console.warn('Failed to mirror to device storage:', e));
     }
   }, [liveData]);
@@ -948,6 +959,8 @@ export default function App() {
 
         setCustomers([]);
         setLoans([]);
+        setRepayments([]);
+        setExpenses([]);
         setSettings(DEFAULT_SETTINGS);
         setTempSettings(DEFAULT_SETTINGS);
 
@@ -1432,10 +1445,77 @@ export default function App() {
         customers,
         loans: updatedLoans,
         repayments: updatedRepayments,
+        expenses,
       }).catch(() => {});
     } catch (err: any) {
       console.error('Failed to delete payment:', err);
       throw err;
+    }
+  };
+
+  // --- Operating Expense Handlers ---
+  const handleOpenExpenseModal = (initialDate?: string) => {
+    setExpenseModalInitialDate(initialDate);
+    setShowExpenseModal(true);
+  };
+
+  const handleSaveExpense = async (data: {
+    amount: number;
+    category: string;
+    date: string;
+    notes?: string;
+  }) => {
+    try {
+      const res = await createExpense({
+        amount: data.amount,
+        category: data.category,
+        date: data.date,
+        notes: data.notes,
+      });
+
+      const newExpense: Expense = {
+        id: (res as any)?._id || (res as any)?.id || `exp_${Date.now()}`,
+        amount: data.amount,
+        category: data.category as any,
+        date: data.date,
+        notes: data.notes,
+        createdAt: Date.now(),
+      };
+
+      const updatedExpenses = [newExpense, ...expenses.filter((e) => e.id !== newExpense.id)];
+      setExpenses(updatedExpenses);
+
+      saveCachedSnapshot({
+        settings,
+        customers,
+        loans,
+        repayments,
+        expenses: updatedExpenses,
+      }).catch(() => {});
+
+      setShowExpenseModal(false);
+    } catch (err: any) {
+      console.error('Failed to save operating expense:', err);
+      throw err;
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      await deleteExpenseById(expenseId);
+      const updatedExpenses = expenses.filter((e) => e.id !== expenseId);
+      setExpenses(updatedExpenses);
+
+      saveCachedSnapshot({
+        settings,
+        customers,
+        loans,
+        repayments,
+        expenses: updatedExpenses,
+      }).catch(() => {});
+    } catch (err: any) {
+      console.error('Failed to delete operating expense:', err);
+      alert('Failed to delete expense record.');
     }
   };
 
@@ -2619,6 +2699,7 @@ export default function App() {
 
           <nav className="space-y-2">
             <NavItem id="dashboard" icon={Icons.TrendingUp} label="Overview & Loans" />
+            <NavItem id="monthly" icon={Icons.FileText} label="Monthly Financials" badge={expenses.length} />
             <NavItem id="loans" icon={Icons.Users} label="Client List" badge={customers.length} />
             <NavItem id="entry" icon={Icons.Plus} label="New Loan" />
             <NavItem id="settings" icon={Icons.Settings} label="Global Settings" />
@@ -3529,8 +3610,10 @@ export default function App() {
                 loans={loans}
                 customers={customers}
                 repayments={repayments}
+                expenses={expenses}
                 settings={settings}
                 onExportCsv={() => exportPortfolioToCsv(loans, customers, repayments, settings)}
+                onViewMonthlyRecords={() => setView('monthly')}
               />
 
               <div className="mt-8 space-y-4">
@@ -4012,6 +4095,25 @@ export default function App() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* VIEW: MONTHLY FINANCIALS & EXPENDITURE RECORDS */}
+          {view === 'monthly' && (
+            <MonthlyExpenditureView
+              loans={loans}
+              customers={customers}
+              repayments={repayments}
+              expenses={expenses}
+              onOpenNewLoan={() => setView('entry')}
+              onOpenExpenseModal={handleOpenExpenseModal}
+              onDeleteExpense={handleDeleteExpense}
+              onViewLoanDetails={(loanId) => {
+                const targetLoan = loans.find((l) => l.id === loanId);
+                if (targetLoan) {
+                  setPaymentModalLoan(targetLoan);
+                }
+              }}
+            />
           )}
 
           {/* VIEW: CLIENT LIST & BORROWER PROFILES */}
@@ -5631,6 +5733,19 @@ export default function App() {
           <span className="text-[10px] mt-1 font-medium">Overview</span>
         </button>
 
+        {/* Monthly Financials */}
+        <button
+          onClick={() => setView('monthly')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-300 ${
+            view === 'monthly' 
+              ? 'text-money-600 dark:text-money-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+              : 'text-slate-500 dark:text-shark-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icons.FileText />
+          <span className="text-[10px] mt-1 font-medium">Financials</span>
+        </button>
+
         {/* Loans */}
         <button
           onClick={() => setView('loans')}
@@ -5641,7 +5756,7 @@ export default function App() {
           }`}
         >
           <Icons.Users />
-          <span className="text-[10px] mt-1 font-medium">Loans</span>
+          <span className="text-[10px] mt-1 font-medium">Clients</span>
         </button>
 
         {/* New Entry */}
@@ -5654,7 +5769,7 @@ export default function App() {
           }`}
         >
           <Icons.Plus />
-          <span className="text-[10px] mt-1 font-medium">New Entry</span>
+          <span className="text-[10px] mt-1 font-medium">New</span>
         </button>
 
         {/* Settings */}
@@ -5895,6 +6010,14 @@ export default function App() {
           handleSaveLoan({ forceNewCustomer: true });
         }}
         onClose={() => setDuplicateCustomerPrompt(null)}
+      />
+
+      {/* OPERATING EXPENSE LOGGER MODAL */}
+      <ExpenseModal
+        isOpen={showExpenseModal}
+        onClose={() => setShowExpenseModal(false)}
+        onSaveExpense={handleSaveExpense}
+        initialDate={expenseModalInitialDate}
       />
 
       {/* 24-HOUR NEW FEATURE ANNOUNCEMENT MODAL */}

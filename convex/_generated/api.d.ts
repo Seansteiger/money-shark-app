@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as bootstrap from "../bootstrap.js";
 import type * as customers from "../customers.js";
+import type * as expenses from "../expenses.js";
 import type * as http from "../http.js";
 import type * as loans from "../loans.js";
 import type * as passkeys from "../passkeys.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   bootstrap: typeof bootstrap;
   customers: typeof customers;
+  expenses: typeof expenses;
   http: typeof http;
   loans: typeof loans;
   passkeys: typeof passkeys;

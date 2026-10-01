@@ -97,3 +97,53 @@ export interface ChatMessage {
   image?: string; // Base64
   isSystem?: boolean;
 }
+
+export type ExpenseCategory =
+  | 'TRANSPORT'
+  | 'AIRTIME'
+  | 'ADMIN'
+  | 'BANK_FEES'
+  | 'LEGAL'
+  | 'MARKETING'
+  | 'OTHER';
+
+export interface Expense {
+  id: string;
+  amount: number;
+  category: ExpenseCategory | string;
+  date: string; // ISO date YYYY-MM-DD
+  notes?: string;
+  createdAt?: number;
+}
+
+export interface MonthlyRecordItem {
+  id: string;
+  type: 'LOAN' | 'REPAYMENT' | 'EXPENSE';
+  date: string; // YYYY-MM-DD
+  amount: number;
+  flow: 'OUTFLOW' | 'INFLOW';
+  title: string;
+  subtitle: string;
+  category?: string;
+  statusBadge?: string;
+  statusBadgeColor?: string;
+  loanId?: string;
+  customerId?: string;
+  notes?: string;
+}
+
+export interface MonthSummary {
+  monthKey: string; // YYYY-MM
+  monthLabel: string; // e.g. "October 2026"
+  year: number;
+  monthIndex: number; // 0-11
+  loanCapitalOutflow: number; // Principal lent out
+  operatingExpenses: number; // Business expenses
+  totalExpenditure: number; // loanCapitalOutflow + operatingExpenses
+  cashCollected: number; // Repayments
+  netCashFlow: number; // cashCollected - totalExpenditure
+  loansCount: number;
+  repaymentsCount: number;
+  expensesCount: number;
+  records: MonthlyRecordItem[];
+}

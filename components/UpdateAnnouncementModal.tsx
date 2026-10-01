@@ -46,6 +46,14 @@ const UPDATES: UpdateItem[] = [
     details:
       'Your sorting choices for loans (Highest Balance, Soonest, Newest, A–Z) and clients now stay saved permanently on your device and cloud account.',
   },
+  {
+    id: 'monthly-expenditure',
+    icon: '📊',
+    title: 'Monthly Financial Records & Cash Flow',
+    shortSummary: 'Track capital outflow, collections & business costs',
+    details:
+      'View total monthly expenditure (loan capital deployed + business operating costs like transport, airtime, utilities), collected repayments, and net cash flow with visual comparison bars and Excel/CSV export.',
+  },
 ];
 
 export const UpdateAnnouncementModal: React.FC<UpdateAnnouncementModalProps> = ({

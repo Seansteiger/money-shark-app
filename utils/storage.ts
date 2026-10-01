@@ -1,4 +1,4 @@
-import { AppSettings, Customer, Loan, Repayment } from '../types';
+import { AppSettings, Customer, Loan, Repayment, Expense } from '../types';
 
 const DB_NAME = 'MoneyShark_DeviceDB';
 const DB_VERSION = 1;
@@ -155,6 +155,7 @@ export interface CachedSnapshot {
   customers: Customer[];
   loans: Loan[];
   repayments?: Repayment[];
+  expenses?: Expense[];
   timestamp: number;
 }
 
@@ -163,6 +164,7 @@ export const saveCachedSnapshot = async (data: {
   customers: Customer[];
   loans: Loan[];
   repayments?: Repayment[];
+  expenses?: Expense[];
 }) => {
   const snapshot: CachedSnapshot = {
     ...data,

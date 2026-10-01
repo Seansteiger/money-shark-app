@@ -41,10 +41,16 @@ export const get = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
 
+    const expensesDocs = await ctx.db
+      .query("expenses")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
     // Filter out soft-deleted records (30-day recovery vault items)
     const activeCustomers = customersDocs.filter((c) => !c.isDeleted);
     const activeLoans = loansDocs.filter((l) => !l.isDeleted);
     const activeLoanIds = new Set(activeLoans.map((l) => l._id));
+    const activeExpenses = expensesDocs.filter((e) => !e.isDeleted);
 
     // Only include repayments that belong to active loans (referential integrity)
     const activeRepayments = repaymentsDocs.filter((r) => !r.isDeleted && activeLoanIds.has(r.loanId));
@@ -70,6 +76,8 @@ export const get = query({
     const sortedCustomers = [...activeCustomers].sort((a, b) => b._creationTime - a._creationTime);
     // Sort repayments by payment date descending
     const sortedRepayments = [...deduplicatedRepayments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+    // Sort expenses by date descending
+    const sortedExpenses = [...activeExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return {
       settings: settingsDoc
@@ -113,6 +121,14 @@ export const get = query({
         paymentMethod: r.paymentMethod,
         notes: r.notes || "",
         createdAt: r._creationTime,
+      })),
+      expenses: sortedExpenses.map((e) => ({
+        id: e._id,
+        amount: e.amount,
+        category: e.category,
+        date: e.date,
+        notes: e.notes || "",
+        createdAt: e._creationTime,
       })),
     };
   },

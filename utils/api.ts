@@ -1,6 +1,6 @@
 import { api } from '../convex/_generated/api';
 import { convex } from './convexClient';
-import { AppSettings, Customer, Loan, Repayment } from '../types';
+import { AppSettings, Customer, Loan, Repayment, Expense } from '../types';
 
 export const getBootstrap = async () => {
   return convex.query(api.bootstrap.get);
@@ -114,3 +114,21 @@ export const resetAllData = async () => {
 export const seedDemoData = async () => {
   return convex.mutation(api.seed.seedDemoData);
 };
+
+export const createExpense = async (payload: {
+  amount: number;
+  category: string;
+  date: string;
+  notes?: string;
+}) => {
+  return (await convex.mutation(api.expenses.createExpense, payload)) as Expense;
+};
+
+export const deleteExpense = async (id: string) => {
+  return convex.mutation(api.expenses.deleteExpense, { id: id as any });
+};
+
+export const listExpenses = async () => {
+  return convex.query(api.expenses.listExpenses);
+};
+

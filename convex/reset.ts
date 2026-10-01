@@ -43,6 +43,15 @@ export const resetData = mutation({
       await ctx.db.delete(r._id);
     }
 
+    // Delete all expenses for this user
+    const expenses = await ctx.db
+      .query("expenses")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const exp of expenses) {
+      await ctx.db.delete(exp._id);
+    }
+
     // Reset settings
     const existingSettings = await ctx.db
       .query("settings")

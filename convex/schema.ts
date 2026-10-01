@@ -63,4 +63,14 @@ export default defineSchema({
     deviceName: v.string(),
     createdAt: v.number(),
   }).index("by_userId", ["userId"]).index("by_credentialId", ["credentialId"]),
+
+  expenses: defineTable({
+    userId: v.id("users"),
+    amount: v.number(),
+    category: v.string(), // "TRANSPORT" | "AIRTIME" | "ADMIN" | "BANK_FEES" | "LEGAL" | "MARKETING" | "OTHER"
+    date: v.string(), // ISO Date YYYY-MM-DD
+    notes: v.optional(v.string()),
+    isDeleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
+  }).index("by_userId", ["userId"]),
 });

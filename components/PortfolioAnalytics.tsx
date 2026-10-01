@@ -1,21 +1,26 @@
-import React, { useState } from 'react';
-import { Loan, Customer, Repayment, AppSettings } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Loan, Customer, Repayment, Expense, AppSettings } from '../types';
 import { calculateLoanDetails, formatCurrency } from '../utils/calculations';
+import { getCurrentMonthKey, getMonthLabel, getMonthKey } from '../utils/monthlyCalculations';
 
 interface PortfolioAnalyticsProps {
   loans: Loan[];
   customers: Customer[];
   repayments: Repayment[];
+  expenses?: Expense[];
   settings: AppSettings;
   onExportCsv: () => void;
+  onViewMonthlyRecords?: () => void;
 }
 
 export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
   loans,
   customers,
   repayments,
+  expenses = [],
   settings,
   onExportCsv,
+  onViewMonthlyRecords,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
@@ -69,6 +74,35 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
   const recoveryRate = totalGrossDebt > 0 
     ? Math.min(100, Math.round((totalRepaid / totalGrossDebt) * 100))
     : 0;
+
+  // Current Month Cash Flow & Expenditure Calculation
+  const curMonthKey = getCurrentMonthKey();
+  const curMonthLabel = getMonthLabel(curMonthKey);
+
+  let curMonthLent = 0;
+  loans.forEach((l) => {
+    if (l.startDate && getMonthKey(l.startDate) === curMonthKey) {
+      curMonthLent += l.principal;
+    }
+  });
+
+  let curMonthExpenses = 0;
+  expenses.forEach((e) => {
+    if (e.date && getMonthKey(e.date) === curMonthKey) {
+      curMonthExpenses += e.amount;
+    }
+  });
+
+  const curMonthExpenditure = curMonthLent + curMonthExpenses;
+
+  let curMonthInflow = 0;
+  repayments.forEach((r) => {
+    if (r.paymentDate && getMonthKey(r.paymentDate) === curMonthKey) {
+      curMonthInflow += r.amount;
+    }
+  });
+
+  const curMonthNet = curMonthInflow - curMonthExpenditure;
 
   return (
     <div className="bg-white dark:bg-shark-800 rounded-3xl border border-slate-200 dark:border-shark-700 shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden transition-all duration-300">
@@ -159,6 +193,45 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
             Initial markup + compounding
           </div>
         </div>
+      </div>
+
+      {/* Current Month Expenditure & Cash Flow Spotlight */}
+      <div className="px-5 md:px-6 py-3.5 bg-gradient-to-r from-slate-50 via-amber-500/5 to-emerald-500/5 dark:from-shark-900/60 dark:via-amber-500/5 dark:to-emerald-500/5 border-t border-slate-100 dark:border-shark-750 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+            <span>📅</span>
+            <span>{curMonthLabel} Cash Flow:</span>
+          </span>
+          <span className="text-rose-600 dark:text-rose-400 font-semibold font-mono">
+            Expenditure: {formatCurrency(curMonthExpenditure)}
+          </span>
+          <span className="text-slate-300 dark:text-shark-600 hidden sm:inline">•</span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+            Inflow: {formatCurrency(curMonthInflow)}
+          </span>
+          <span className="text-slate-300 dark:text-shark-600 hidden sm:inline">•</span>
+          <span
+            className={`font-bold font-mono ${
+              curMonthNet >= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-amber-600 dark:text-amber-400'
+            }`}
+          >
+            Net: {curMonthNet >= 0 ? '+' : ''}
+            {formatCurrency(curMonthNet)}
+          </span>
+        </div>
+
+        {onViewMonthlyRecords && (
+          <button
+            type="button"
+            onClick={onViewMonthlyRecords}
+            className="text-xs font-bold text-money-600 hover:text-money-500 dark:text-money-400 flex items-center gap-1 cursor-pointer transition-colors shrink-0 group"
+          >
+            <span>View Monthly Breakdown & Overall Records</span>
+            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
       </div>
 
       {/* Expanded Risk & Aging Breakdown */}
