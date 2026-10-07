@@ -2729,8 +2729,8 @@ export default function App() {
                 className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-shark-800/80 hover:bg-slate-200/70 dark:hover:bg-shark-750 border border-slate-200 dark:border-shark-700 text-slate-750 dark:text-slate-200 transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="text-base">
-                    ✨
+                  <div className="p-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Icons.FileText />
                   </div>
                   <div>
                     <div className="text-sm font-bold">What's New (Updates)</div>

@@ -111,16 +111,13 @@ export const UpdateAnnouncementModal: React.FC<UpdateAnnouncementModalProps> = (
 
         {/* Compact Header */}
         <div className="px-4 py-3 border-b border-slate-100 dark:border-shark-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">✨</span>
-            <div>
-              <h3 id="update-summary-title" className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                Updates Summary
-              </h3>
-              <p className="text-[10px] text-slate-400 dark:text-shark-500">
-                Tap any bullet point to read details
-              </p>
-            </div>
+          <div>
+            <h3 id="update-summary-title" className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              Updates Summary
+            </h3>
+            <p className="text-[10px] text-slate-400 dark:text-shark-500">
+              Tap any bullet point to read details
+            </p>
           </div>
 
           <button
