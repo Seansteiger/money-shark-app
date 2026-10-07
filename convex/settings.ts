@@ -7,6 +7,7 @@ export const save = mutation({
     globalInitialInterestRate: v.number(),
     globalInterestRate: v.number(),
     globalCompoundMonthly: v.boolean(),
+    gracePeriodDays: v.optional(v.number()),
     isBiometricLockEnabled: v.optional(v.boolean()),
     showHints: v.optional(v.boolean()),
     autoRemoveInactiveClients: v.optional(v.boolean()),
@@ -30,6 +31,10 @@ export const save = mutation({
       globalInterestRate: args.globalInterestRate,
       globalCompoundMonthly: args.globalCompoundMonthly,
     };
+
+    if (args.gracePeriodDays !== undefined) {
+      data.gracePeriodDays = args.gracePeriodDays;
+    }
 
     if (args.isBiometricLockEnabled !== undefined) {
       data.isBiometricLockEnabled = args.isBiometricLockEnabled;

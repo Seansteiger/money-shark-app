@@ -10,6 +10,7 @@ export default defineSchema({
     globalInitialInterestRate: v.number(),
     globalInterestRate: v.number(),
     globalCompoundMonthly: v.boolean(),
+    gracePeriodDays: v.optional(v.number()),
     isBiometricLockEnabled: v.optional(v.boolean()),
     showHints: v.optional(v.boolean()),
     autoRemoveInactiveClients: v.optional(v.boolean()),

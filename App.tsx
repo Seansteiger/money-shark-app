@@ -233,6 +233,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   globalInitialInterestRate: 50,
   globalInterestRate: 30,
   globalCompoundMonthly: true,
+  gracePeriodDays: 7,
   isBiometricLockEnabled: false,
   showHints: true,
   autoRemoveInactiveClients: false,
@@ -242,8 +243,8 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 
 // 24-Hour Update Announcement Configuration
-const UPDATE_ANNOUNCEMENT_ID = '2026-09-27-features';
-const UPDATE_ANNOUNCEMENT_START = new Date('2026-09-27T17:00:00Z').getTime();
+const UPDATE_ANNOUNCEMENT_ID = '2026-10-07-grace-and-halves';
+const UPDATE_ANNOUNCEMENT_START = new Date('2026-10-07T08:00:00Z').getTime();
 const UPDATE_ANNOUNCEMENT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
 
 export default function App() {
@@ -306,6 +307,7 @@ export default function App() {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseModalInitialDate, setExpenseModalInitialDate] = useState<string | undefined>(undefined);
   const [paymentModalLoan, setPaymentModalLoan] = useState<Loan | null>(null);
+  const [paymentModalMode, setPaymentModalMode] = useState<'FULL' | 'HALF' | 'CUSTOM'>('CUSTOM');
   const [loanFilterTab, setLoanFilterTab] = useState<'ALL' | 'GRACE' | 'COMPOUNDING' | 'OVERDUE'>('ALL');
   const [loanSortBy, setLoanSortBy] = useState<'BALANCE_DESC' | 'DUE_SOONEST' | 'NEWEST' | 'NAME'>('BALANCE_DESC');
   const [loading, setLoading] = useState(true);
@@ -1430,7 +1432,8 @@ export default function App() {
             targetLoan,
             settings.globalInitialInterestRate,
             settings.globalInterestRate,
-            updatedRepayments
+            updatedRepayments,
+            settings.gracePeriodDays ?? 7
           );
           if (calc.remainingBalance > 0.01) {
             updatedLoans = loans.map((l) => (l.id === targetLoan.id ? { ...l, status: 'ACTIVE' as const } : l));
@@ -1524,7 +1527,7 @@ export default function App() {
   const totalPrincipal = activeLoans.reduce((sum, l) => sum + l.principal, 0);
 
   const loanCalculations = activeLoans.map((l) => {
-    return calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+    return calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments, settings.gracePeriodDays ?? 7);
   });
 
   const totalInterest = loanCalculations.reduce((sum, c) => sum + c.interestAccrued, 0);
@@ -1537,7 +1540,8 @@ export default function App() {
         loan,
         settings.globalInitialInterestRate,
         settings.globalInterestRate,
-        repayments
+        repayments,
+        settings.gracePeriodDays ?? 7
       );
 
       // Filter Tab logic
@@ -1563,8 +1567,8 @@ export default function App() {
       );
     })
     .sort((a, b) => {
-      const calcA = calculateLoanDetails(a, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
-      const calcB = calculateLoanDetails(b, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+      const calcA = calculateLoanDetails(a, settings.globalInitialInterestRate, settings.globalInterestRate, repayments, settings.gracePeriodDays ?? 7);
+      const calcB = calculateLoanDetails(b, settings.globalInitialInterestRate, settings.globalInterestRate, repayments, settings.gracePeriodDays ?? 7);
 
       if (loanSortBy === 'BALANCE_DESC') {
         return calcB.remainingBalance - calcA.remainingBalance;
@@ -1603,7 +1607,8 @@ export default function App() {
         loan,
         settings.globalInitialInterestRate,
         settings.globalInterestRate,
-        repayments
+        repayments,
+        settings.gracePeriodDays ?? 7
       );
 
       if (!groupMap.has(cId)) {
@@ -3818,7 +3823,8 @@ export default function App() {
                               loan,
                               settings.globalInitialInterestRate,
                               settings.globalInterestRate,
-                              repayments
+                              repayments,
+                              settings.gracePeriodDays ?? 7
                             );
                             const activeInitialRate = loan.isFixedRate ? settings.globalInitialInterestRate : loan.initialInterestRate;
                             const activeMonthlyRate = loan.isFixedRate ? settings.globalInterestRate : loan.interestRate;
@@ -3859,7 +3865,22 @@ export default function App() {
                                   <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto flex-wrap">
                                     <button
                                       type="button"
-                                      onClick={() => setPaymentModalLoan(loan)}
+                                      onClick={() => {
+                                        setPaymentModalMode('HALF');
+                                        setPaymentModalLoan(loan);
+                                      }}
+                                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                                      title={calc.isHalfPaid ? 'Record 2nd Half settlement payment' : 'Record a 50% half payment'}
+                                    >
+                                      <span>🌓</span>
+                                      <span>{calc.isHalfPaid ? 'Pay 2nd Half' : 'Pay Half'}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPaymentModalMode('CUSTOM');
+                                        setPaymentModalLoan(loan);
+                                      }}
                                       className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
                                       title="Record an installment payment"
                                     >
@@ -3895,22 +3916,38 @@ export default function App() {
                                 {/* Compounding Cycle Countdown & Repayment Progress */}
                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-shark-900/80 border border-slate-100 dark:border-shark-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    {calc.riskCategory === 'GRACE_PERIOD' && (
-                                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5" title="Cycle 1: 0–30 days initial period">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                        <span>Cycle 1</span>
+                                    {calc.isInGracePeriod ? (
+                                      <span
+                                        className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1.5 shadow-xs"
+                                        title={`Within ${calc.gracePeriodDays}-Day Grace Window until ${calc.graceDeadlineDate}. No compounding interest will be added.`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>🛡️ Grace Active: {calc.graceDaysRemaining}d left</span>
                                       </span>
-                                    )}
-                                    {calc.riskCategory === 'COMPOUNDING_1' && (
-                                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5" title="Cycle 2: 31–60 days compounding">
+                                    ) : calc.riskCategory === 'GRACE_PERIOD' ? (
+                                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5" title={`Cycle 1: Day ${calc.daysElapsed}/30`}>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span>Cycle 1 ({calc.daysElapsed}d)</span>
+                                      </span>
+                                    ) : calc.riskCategory === 'COMPOUNDING_1' ? (
+                                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5" title="Cycle 2: compounding active">
                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                         <span>Cycle 2</span>
                                       </span>
-                                    )}
-                                    {calc.riskCategory === 'OVERDUE_HIGH_RISK' && (
-                                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5" title={`Cycle ${calc.monthsElapsed + 1}: 60+ days compounding`}>
+                                    ) : (
+                                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[11px] font-bold flex items-center gap-1.5" title={`Cycle ${calc.monthsElapsed + 1}: compounding active`}>
                                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         <span>Cycle {calc.monthsElapsed + 1}</span>
+                                      </span>
+                                    )}
+
+                                    {calc.isHalfPaid && (
+                                      <span
+                                        className="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 text-[11px] font-bold flex items-center gap-1"
+                                        title="Borrower has settled 50% of the loan"
+                                      >
+                                        <span>🌓</span>
+                                        <span>1st Half Paid</span>
                                       </span>
                                     )}
                                   </div>
@@ -3918,7 +3955,10 @@ export default function App() {
                                   {calc.totalRepaid > 0 ? (
                                     <button
                                       type="button"
-                                      onClick={() => setPaymentModalLoan(loan)}
+                                      onClick={() => {
+                                        setPaymentModalMode('CUSTOM');
+                                        setPaymentModalLoan(loan);
+                                      }}
                                       className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer"
                                     >
                                       <span>✓ Paid {formatCurrency(calc.totalRepaid)}</span>
@@ -3975,7 +4015,7 @@ export default function App() {
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-6">Closed & History Records</h2>
                 <div className="grid gap-4">
                   {loans.filter(l => l.status !== 'ACTIVE').map((loan) => {
-                    const calc = calculateLoanDetails(loan, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+                    const calc = calculateLoanDetails(loan, settings.globalInitialInterestRate, settings.globalInterestRate, repayments, settings.gracePeriodDays ?? 7);
                     return (
                       <div key={loan.id} className="bg-white dark:bg-shark-800 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-shark-700 flex flex-col gap-4 opacity-85 shadow-sm hover:opacity-100 transition-all duration-300">
                         <div className="flex justify-between items-start">
@@ -4043,7 +4083,10 @@ export default function App() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setPaymentModalLoan(loan)}
+                              onClick={() => {
+                                setPaymentModalMode('CUSTOM');
+                                setPaymentModalLoan(loan);
+                              }}
                               title="View Payment Ledger"
                               className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/20 transition-all flex items-center gap-1 cursor-pointer"
                             >
@@ -4110,6 +4153,7 @@ export default function App() {
               onViewLoanDetails={(loanId) => {
                 const targetLoan = loans.find((l) => l.id === loanId);
                 if (targetLoan) {
+                  setPaymentModalMode('CUSTOM');
                   setPaymentModalLoan(targetLoan);
                 }
               }}
@@ -4242,7 +4286,7 @@ export default function App() {
                   const activeCustLoans = customerLoans.filter(l => l.status === 'ACTIVE');
                   const totalCustPrincipal = activeCustLoans.reduce((sum, l) => sum + l.principal, 0);
                   const totalCustDebt = activeCustLoans.reduce((sum, l) => {
-                    const d = calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate);
+                    const d = calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments, settings.gracePeriodDays ?? 7);
                     return sum + d.totalAmount;
                   }, 0);
 
@@ -4367,7 +4411,7 @@ export default function App() {
                           </div>
                           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                             {customerLoans.map((l, i) => {
-                              const calc = calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments);
+                              const calc = calculateLoanDetails(l, settings.globalInitialInterestRate, settings.globalInterestRate, repayments, settings.gracePeriodDays ?? 7);
                               return (
                                 <div
                                   key={l.id}
@@ -4393,7 +4437,10 @@ export default function App() {
                                     </span>
                                     <button
                                       type="button"
-                                      onClick={() => setPaymentModalLoan(l)}
+                                      onClick={() => {
+                                        setPaymentModalMode('CUSTOM');
+                                        setPaymentModalLoan(l);
+                                      }}
                                       className="px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors cursor-pointer"
                                       title="Record repayment on this loan"
                                     >
@@ -5194,20 +5241,47 @@ export default function App() {
 
                 <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
 
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Grace Period Window</h3>
+                    <p className="text-sm text-slate-500 dark:text-shark-400 mt-0.5">
+                      Days allowed after the 30-day term before interest compounds (e.g. 7 days protects borrowers paying on Days 31–37).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="number"
+                      min="0"
+                      max="60"
+                      step="1"
+                      value={tempSettings.gracePeriodDays ?? 7}
+                      onChange={(e) => setTempSettings({ ...tempSettings, gracePeriodDays: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="bg-slate-50 dark:bg-shark-900 border border-slate-300 dark:border-shark-600 text-slate-900 dark:text-white rounded-xl p-2 w-20 sm:w-24 text-right font-mono transition-colors focus:border-money-500 focus:ring-2 focus:ring-money-500/20 outline-none"
+                    />
+                    <span className="text-slate-500 dark:text-shark-400 font-semibold text-xs">days</span>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-shark-700 my-4"></div>
+
                 {/* Interest Rates Explainer Box */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-shark-900 border border-slate-200 dark:border-shark-700 space-y-2 text-xs text-slate-600 dark:text-shark-300">
                   <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-white">
                     <span className="text-money-500"><Icons.Lightbulb /></span>
                     <span>How Your Profit Calculations Work:</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                     <div className="p-3 bg-white dark:bg-shark-800 rounded-lg border border-slate-200 dark:border-shark-700">
                       <span className="font-bold text-money-600 dark:text-money-400 block mb-1">🏷️ Initial Markup (e.g. {tempSettings.globalInitialInterestRate}%)</span>
                       <span>Added immediately when a loan is issued. For instance, a R1,000 principal at {tempSettings.globalInitialInterestRate}% becomes R{1000 * (1 + (tempSettings.globalInitialInterestRate || 50) / 100)} total starting balance.</span>
                     </div>
                     <div className="p-3 bg-white dark:bg-shark-800 rounded-lg border border-slate-200 dark:border-shark-700">
                       <span className="font-bold text-money-600 dark:text-money-400 block mb-1">📈 Monthly Compounding (e.g. {tempSettings.globalInterestRate}%)</span>
-                      <span>After the first 30 days, every additional month compounds an extra {tempSettings.globalInterestRate}% on the outstanding balance.</span>
+                      <span>After the grace window, each completed month compounds an extra {tempSettings.globalInterestRate}% on the outstanding balance.</span>
+                    </div>
+                    <div className="p-3 bg-white dark:bg-shark-800 rounded-lg border border-slate-200 dark:border-shark-700">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 block mb-1">🛡️ Grace Buffer ({tempSettings.gracePeriodDays ?? 7} Days)</span>
+                      <span>Borrowers who pay within {tempSettings.gracePeriodDays ?? 7} days after the 30-day cycle are protected from compounding interest penalties.</span>
                     </div>
                   </div>
                 </div>
@@ -5972,13 +6046,15 @@ export default function App() {
                 paymentModalLoan,
                 settings.globalInitialInterestRate,
                 settings.globalInterestRate,
-                repayments
+                repayments,
+                settings.gracePeriodDays ?? 7
               )
             : null
         }
         repayments={repayments}
         onRecordPayment={handleRecordPayment}
         onDeletePayment={handleDeletePayment}
+        initialMode={paymentModalMode}
       />
 
       {/* DUPLICATE / EXISTING CUSTOMER CONFIRMATION MODAL */}

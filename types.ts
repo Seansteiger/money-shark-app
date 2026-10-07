@@ -40,6 +40,7 @@ export interface AppSettings {
   globalInitialInterestRate: number;
   globalInterestRate: number;
   globalCompoundMonthly: boolean;
+  gracePeriodDays?: number; // Grace period buffer in days (default: 7 days)
   isBiometricLockEnabled?: boolean;
   showHints?: boolean;
   autoRemoveInactiveClients?: boolean;

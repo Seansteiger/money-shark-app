@@ -15,6 +15,30 @@ interface UpdateItem {
 
 const UPDATES: UpdateItem[] = [
   {
+    id: 'grace-period',
+    icon: '🛡️',
+    title: '7-Day Grace Period Protection',
+    shortSummary: 'No compounding interest added on Days 31–37',
+    details:
+      'Borrowers who pay the day or week after the 30-day term are protected by an automatic 7-day grace window. Compounding interest only applies on Day 38+. Grace length is fully customizable in Settings.',
+  },
+  {
+    id: 'pay-in-halves',
+    icon: '🌓',
+    title: 'Pay in Halves (50% Installments)',
+    shortSummary: 'Record 1st half & settlement payments with 1 tap',
+    details:
+      'Easily record partial 50% payments with one tap on the loan card. The payment modal automatically calculates the exact half split, provides clear labels for the 1st installment vs final settlement, and highlights half-paid loans with a badge.',
+  },
+  {
+    id: 'monthly-expenditure',
+    icon: '📊',
+    title: 'Monthly Financial Records & Cash Flow',
+    shortSummary: 'Track capital outflow, collections & business costs',
+    details:
+      'View total monthly expenditure (loan capital deployed + business operating costs like transport, airtime, utilities), collected repayments, and net cash flow with visual comparison bars and Excel/CSV export.',
+  },
+  {
     id: 'closed-loan',
     icon: '➕',
     title: 'Add Loan from Closed Records',
@@ -45,14 +69,6 @@ const UPDATES: UpdateItem[] = [
     shortSummary: 'Arrangement stays saved across refreshes',
     details:
       'Your sorting choices for loans (Highest Balance, Soonest, Newest, A–Z) and clients now stay saved permanently on your device and cloud account.',
-  },
-  {
-    id: 'monthly-expenditure',
-    icon: '📊',
-    title: 'Monthly Financial Records & Cash Flow',
-    shortSummary: 'Track capital outflow, collections & business costs',
-    details:
-      'View total monthly expenditure (loan capital deployed + business operating costs like transport, airtime, utilities), collected repayments, and net cash flow with visual comparison bars and Excel/CSV export.',
   },
 ];
 

@@ -12,19 +12,30 @@ export interface LoanCalculations {
   repaymentProgress: number; // 0 to 100%
   repaymentCount: number;
   isFullyPaid: boolean;
-  // 30-Day Cycle Countdown & Urgency
+  // 30-Day Cycle Countdown, Grace Period & Urgency
   daysElapsed: number;
   daysInCurrentCycle: number;
-  daysUntilNextCycle: number;
-  nextCompoundDate: string; // ISO date or formatted
+  daysUntilNextCycle: number; // Days until next compound interest addition
+  nextCompoundDate: string; // Date when interest will compound (end of grace period)
+  cycleDueDate: string; // Base 30-day cycle due date
+  daysUntilCycleDue: number; // Days remaining to base 30-day mark (can be negative if in grace)
+  gracePeriodDays: number; // Default: 7
+  isInGracePeriod: boolean; // True if within the 7-day grace period
+  graceDaysRemaining: number; // Days left in grace window before interest compounds
+  graceDeadlineDate: string; // ISO date when grace period expires
   riskCategory: 'GRACE_PERIOD' | 'COMPOUNDING_1' | 'OVERDUE_HIGH_RISK';
+  // Half-Payment & Installment tracking
+  baseHalfAmount: number; // 50% of original gross debt
+  remainingHalfAmount: number; // 50% of current remaining balance
+  isHalfPaid: boolean; // True if at least 48% of loan has been settled but not 100%
 }
 
 export const calculateLoanDetails = (
   loan: Loan, 
   globalInitialRate: number, 
   globalMonthlyRate: number,
-  allRepayments: Repayment[] = []
+  allRepayments: Repayment[] = [],
+  gracePeriodDays: number = 7
 ): LoanCalculations => {
   const start = new Date(loan.startDate);
   start.setHours(0, 0, 0, 0);
@@ -45,13 +56,38 @@ export const calculateLoanDetails = (
   const baseDebt = principal + initialInterestAmount;
 
   const CYCLE_DAYS = 30;
-  const cycles = Math.floor(daysElapsed / CYCLE_DAYS);
-  const daysInCurrentCycle = daysElapsed % CYCLE_DAYS;
-  const daysUntilNextCycle = CYCLE_DAYS - daysInCurrentCycle;
+  const GRACE_DAYS = Math.max(0, gracePeriodDays ?? 7);
 
-  // Next compound date
-  const nextCompoundTimestamp = start.getTime() + ((cycles + 1) * CYCLE_DAYS * 24 * 60 * 60 * 1000);
+  // Compounding cycles determination:
+  // Each cycle compounds only when daysElapsed strictly exceeds (cycleNumber * 30 + GRACE_DAYS).
+  // E.g. with 7 days grace:
+  // Cycle 1 interest only applies after day 37 (days 31-37 are in Grace Period with 0 interest added).
+  // Cycle 2 interest only applies after day 67 (days 61-67 in Grace Period), etc.
+  let cycles = 0;
+  while (daysElapsed > (cycles + 1) * CYCLE_DAYS + GRACE_DAYS) {
+    cycles++;
+  }
+
+  // Active cycle thresholds
+  const currentCycleBaseDays = (cycles + 1) * CYCLE_DAYS;
+  const currentCycleGraceThreshold = currentCycleBaseDays + GRACE_DAYS;
+
+  // In Grace Period: daysElapsed > 30*k AND daysElapsed <= 30*k + 7
+  const isInGracePeriod = daysElapsed > currentCycleBaseDays && daysElapsed <= currentCycleGraceThreshold;
+  const graceDaysRemaining = isInGracePeriod ? Math.max(0, currentCycleGraceThreshold - daysElapsed) : 0;
+
+  // Cycle due date (the 30-day target)
+  const cycleDueTimestamp = start.getTime() + (currentCycleBaseDays * 24 * 60 * 60 * 1000);
+  const cycleDueDate = new Date(cycleDueTimestamp).toISOString().split('T')[0];
+  const daysUntilCycleDue = Math.ceil((cycleDueTimestamp - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Next compound date (after grace period ends)
+  const nextCompoundTimestamp = start.getTime() + (currentCycleGraceThreshold * 24 * 60 * 60 * 1000);
   const nextCompoundDate = new Date(nextCompoundTimestamp).toISOString().split('T')[0];
+  const graceDeadlineDate = nextCompoundDate;
+  const daysUntilNextCycle = Math.max(0, Math.ceil((nextCompoundTimestamp - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+  const daysInCurrentCycle = daysElapsed % CYCLE_DAYS;
 
   let totalAmount = 0;
 
@@ -100,6 +136,11 @@ export const calculateLoanDetails = (
     riskCategory = 'OVERDUE_HIGH_RISK';
   }
 
+  // Half payment calculations
+  const baseHalfAmount = Math.round((baseDebt / 2) * 100) / 100;
+  const remainingHalfAmount = Math.round((remainingBalance / 2) * 100) / 100;
+  const isHalfPaid = !isFullyPaid && totalRepaid >= (baseHalfAmount - 0.05);
+
   return {
     totalAmount,
     interestAccrued,
@@ -115,7 +156,16 @@ export const calculateLoanDetails = (
     daysInCurrentCycle,
     daysUntilNextCycle,
     nextCompoundDate,
+    cycleDueDate,
+    daysUntilCycleDue,
+    gracePeriodDays: GRACE_DAYS,
+    isInGracePeriod,
+    graceDaysRemaining,
+    graceDeadlineDate,
     riskCategory,
+    baseHalfAmount,
+    remainingHalfAmount,
+    isHalfPaid,
   };
 };
 
