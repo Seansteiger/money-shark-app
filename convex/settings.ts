@@ -66,6 +66,7 @@ export const save = mutation({
       globalInitialInterestRate: args.globalInitialInterestRate,
       globalInterestRate: args.globalInterestRate,
       globalCompoundMonthly: args.globalCompoundMonthly,
+      gracePeriodDays: args.gracePeriodDays ?? existing?.gracePeriodDays ?? 7,
       isBiometricLockEnabled: args.isBiometricLockEnabled ?? existing?.isBiometricLockEnabled ?? false,
       showHints: args.showHints ?? existing?.showHints ?? true,
       autoRemoveInactiveClients: args.autoRemoveInactiveClients ?? existing?.autoRemoveInactiveClients ?? false,

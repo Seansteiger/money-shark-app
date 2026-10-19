@@ -458,7 +458,7 @@ export default function App() {
               if (Notification.permission === 'granted') {
                 try {
                   new Notification("Updates Summary - Money-Shark", {
-                    body: "Add loan on closed records, persistent client list, and permanent sorting preferences.",
+                    body: "7-Day Grace Period protection, Half-Payment installments, and Monthly Expenditure analytics.",
                     icon: "/icons/icon-192x192.png",
                   });
                 } catch {}
@@ -467,7 +467,7 @@ export default function App() {
                   Notification.requestPermission().then((perm) => {
                     if (perm === 'granted') {
                       new Notification("Updates Summary - Money-Shark", {
-                        body: "Add loan on closed records, persistent client list, and permanent sorting preferences.",
+                        body: "7-Day Grace Period protection, Half-Payment installments, and Monthly Expenditure analytics.",
                         icon: "/icons/icon-192x192.png",
                       });
                     }

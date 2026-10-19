@@ -108,7 +108,8 @@ export const DuplicateCustomerModal: React.FC<DuplicateCustomerModalProps> = ({
                     loan,
                     settings.globalInitialInterestRate,
                     settings.globalInterestRate,
-                    repayments
+                    repayments,
+                    settings.gracePeriodDays ?? 7
                   );
                   return (
                     <div

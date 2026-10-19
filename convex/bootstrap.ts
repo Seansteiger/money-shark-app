@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   autoRemoveInactiveClients: false,
   loanSortBy: "BALANCE_DESC",
   clientSortBy: "NAME_ASC",
+  gracePeriodDays: 7,
 };
 
 export const get = query({
@@ -90,6 +91,7 @@ export const get = query({
             autoRemoveInactiveClients: settingsDoc.autoRemoveInactiveClients ?? false,
             loanSortBy: settingsDoc.loanSortBy ?? "BALANCE_DESC",
             clientSortBy: settingsDoc.clientSortBy ?? "NAME_ASC",
+            gracePeriodDays: settingsDoc.gracePeriodDays ?? 7,
           }
         : DEFAULT_SETTINGS,
       customers: sortedCustomers.map((c) => ({

@@ -30,8 +30,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onRecordPayment,
   onDeletePayment,
 }) => {
-  if (!isOpen || !loan || !calculations) return null;
-
   const [paymentMode, setPaymentMode] = useState<'FULL' | 'HALF' | 'CUSTOM'>(initialMode);
   const [amount, setAmount] = useState<string>('');
   const [paymentDate, setPaymentDate] = useState<string>(
@@ -43,10 +41,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
 
-  const loanRepayments = repayments.filter((r) => r.loanId === loan.id);
-  const remaining = calculations.remainingBalance;
-  const baseHalf = calculations.baseHalfAmount;
-  const alreadyRepaid = calculations.totalRepaid;
+  const remaining = calculations?.remainingBalance ?? 0;
+  const baseHalf = calculations?.baseHalfAmount ?? 0;
+  const alreadyRepaid = calculations?.totalRepaid ?? 0;
 
   // Compute exact half payment amount
   const computedHalfAmount = useMemo(() => {
@@ -83,9 +80,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  // Sync initial mode when modal opens
+  // Sync initial mode when modal opens or loan changes
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && loan) {
       if (initialMode === 'HALF') {
         selectPaymentMode('HALF');
       } else if (initialMode === 'FULL') {
@@ -96,8 +93,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         setNotes('');
       }
     }
-  }, [isOpen, initialMode, loan.id]);
+  }, [isOpen, initialMode, loan?.id]);
 
+  // Handle Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !loan || !calculations) return null;
+
+  const loanRepayments = repayments.filter((r) => r.loanId === loan.id);
   const handleQuickAmount = (val: number) => {
     setAmount(val.toFixed(2));
     setErrorMessage('');

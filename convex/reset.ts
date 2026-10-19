@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS = {
   globalInitialInterestRate: 50,
   globalInterestRate: 30,
   globalCompoundMonthly: true,
+  gracePeriodDays: 7,
 };
 
 export const resetData = mutation({

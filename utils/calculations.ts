@@ -170,12 +170,13 @@ export const calculateLoanDetails = (
 };
 
 export const formatCurrency = (amount: number) => {
+  const safeAmount = typeof amount === 'number' && !isNaN(amount) && isFinite(amount) ? amount : 0;
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(safeAmount);
 };
 
 export const formatDate = (dateStr: string) => {

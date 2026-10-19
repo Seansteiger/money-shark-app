@@ -41,7 +41,8 @@ export function exportPortfolioToCsv(
       loan,
       settings.globalInitialInterestRate,
       settings.globalInterestRate,
-      repayments
+      repayments,
+      settings.gracePeriodDays ?? 7
     );
 
     const initialRate = loan.isFixedRate ? settings.globalInitialInterestRate : loan.initialInterestRate;

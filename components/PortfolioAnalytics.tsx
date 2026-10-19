@@ -47,7 +47,8 @@ export const PortfolioAnalytics: React.FC<PortfolioAnalyticsProps> = ({
       loan,
       settings.globalInitialInterestRate,
       settings.globalInterestRate,
-      repayments
+      repayments,
+      settings.gracePeriodDays ?? 7
     );
 
     totalPrincipal += loan.principal;

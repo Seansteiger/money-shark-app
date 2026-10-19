@@ -8,17 +8,25 @@ function computeGrossDebt(
   initialRate: number,
   monthlyRate: number,
   interestType: string,
-  startDateStr: string
+  startDateStr: string,
+  gracePeriodDays: number = 7
 ): number {
   const start = new Date(startDateStr);
   start.setHours(0, 0, 0, 0);
   const now = new Date();
   const diffInMs = now.getTime() - start.getTime();
-  const daysElapsed = Math.max(0, diffInMs / (1000 * 60 * 60 * 24));
+  const daysElapsed = Math.max(0, Math.floor(diffInMs / (1000 * 60 * 60 * 24)));
   
   const initialInterestAmount = principal * (initialRate / 100);
   const baseDebt = principal + initialInterestAmount;
-  const cycles = Math.floor(daysElapsed / 30);
+
+  const CYCLE_DAYS = 30;
+  const GRACE_DAYS = Math.max(0, gracePeriodDays ?? 7);
+
+  let cycles = 0;
+  while (daysElapsed > (cycles + 1) * CYCLE_DAYS + GRACE_DAYS) {
+    cycles++;
+  }
 
   if (cycles <= 0) {
     return baseDebt;
@@ -81,7 +89,8 @@ export const recordPayment = mutation({
       effectiveInitialRate,
       effectiveMonthlyRate,
       loan.interestType,
-      loan.startDate
+      loan.startDate,
+      settings?.gracePeriodDays ?? 7
     );
 
     const remainingDebt = Math.max(0, grossDebt - currentRepaid);
@@ -176,7 +185,8 @@ export const deletePayment = mutation({
         effectiveInitialRate,
         effectiveMonthlyRate,
         loan.interestType,
-        loan.startDate
+        loan.startDate,
+        settings?.gracePeriodDays ?? 7
       );
 
       // If debt is no longer fully cleared, revert to ACTIVE (with 0.01 tolerance)
@@ -261,7 +271,8 @@ export const cleanupDuplicates = mutation({
         effectiveInitialRate,
         effectiveMonthlyRate,
         loan.interestType,
-        loan.startDate
+        loan.startDate,
+        settings?.gracePeriodDays ?? 7
       );
 
       // Deduplicate settlement payments and excessive duplicate records

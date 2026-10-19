@@ -42,6 +42,7 @@ export const seedDemoData = mutation({
       globalInitialInterestRate: 50,
       globalInterestRate: 30,
       globalCompoundMonthly: true,
+      gracePeriodDays: 7,
     });
 
     // Create customers
